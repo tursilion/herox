@@ -400,15 +400,11 @@ l210b
 	sra r1,10       * sign extend, /2!
 	mov r1,@rs
 
-* don't have RND, so using sprite 4 col instead
+* don't have RND, so using animframe
 *211 IF LE=5 THEN CALL PATTERN(#2,108+RND)
 * 2 is never used anywhere else, so can always animate
-	li r0,4
-	bl @position
-	srl r2,2
-	andi r2,1
-	ai r2,108
-	mov r2,r1
+	bl @animframe
+	ai r1,108
 	li r0,2
 	bl *r7
 
