@@ -1,0 +1,2237 @@
+************************
+* HeroXB - by Tursi    *
+* Ported by Tursi      *
+************************
+
+* VDP Usage:
+*
+* 0000	02FF	SDT  (reg 2, 0-F, scale >0400, value 00)
+* 0300	037F	SAL  (reg 5, 00-7F, scale >0080, value 06)
+* 0380	077F
+* 0780	07ff	Sprite motion table (interrupt driven, not movable)
+* 0800	0FFF	PDT (reg 4, 0-7, scale >0800, value 01) & SPT (reg 6, 0-7, scale >0800, value 01)
+* 1000	101F	CT (reg 3, 00-ff, scale >0040, value 40)
+* 1020  3FFF	
+*
+* Register usage
+* R0 - Scratch, argument passing
+* R1 - Scratch, argument passing
+* R2 - Scratch, argument passing
+* R3 - Scratch, argument passing
+* R4 - Scratch, argument passing
+* R5 - wradr function address
+* R6 - coinc function address
+* R7 - pattern function address
+* R8 - Always 1 - don't change it (optimization)
+* R9 - 
+* R10- Subroutine scratch
+* R11- Return address for BL, subroutine usage
+* R12- Subroutine scratch
+* R13- Subroutine scratch
+* R14- Subroutine scratch
+* R15- Subroutine scratch (SUB return address)
+*
+
+* System Free Scratchpad RAM:
+* 00 - 1f - Workspace
+* 20 - 49 - available for variables (check with listing)
+* 4A - 6D - stack area - probably free
+* 6E - 6F - free outside of floating point
+* 70 - 7F - GPL status block
+* 80 - BF - GPL Stack - free
+* C0 - DF - Interrupt workspace
+* E0 - FF - GPLWS
+
+* Subroutine calls
+* wradr		xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (r5)
+* coinc		xxxxxxxxxxxxxxxxxxxxxxxxx		 (r6)
+* pattern	xxxxxxxxxxxxxxxx				 (r7)
+* motion	xxxxxxxxxxxxxx
+* sound		xxxxxxxxxxxxxx
+* position	xxxxxxxxxxxxx
+* vdpset	xxxxxxxxxxx
+* hcharf	xxxxxxxxxx
+* locate	xxxxxxxxx
+* gchar		xxxxxx
+* vcharf	xxxxx
+* vdpcpy	xxxxx
+* cdelay	xxxx
+* display	xxxx
+* pix2char  xxxx
+* scan		xxxx
+* spriteadr	xxxx
+* hchar		xxx
+* key		xxx
+* char		xx
+* disnum	xx
+* DSPRALL	xx
+* hchar1	xx
+* hcharadr	xx
+* CLEAR		x
+* delspr	x
+* dispadr	x
+* sprite	x
+* waitnewkeyx
+* 000e			console ROM keyboard scan, can't inline
+* draw			complex enough to keep separate
+* shapes		complex enough to keep separate
+
+* Variables in RAM
+*
+		AORG >8320
+	
+* VARIABLES
+LE	bss 2
+NM	bss 2
+SC	bss 2
+AS	bss 2
+NW	bss 2
+A	bss 2
+B	bss 2
+qw	bss 2
+ro	bss 2
+co  bss 2
+
+* SHARED VARIABLES
+X		BSS 2			* temporary for x for joystick
+Y		BSS 2			* temporary for y for joystick
+SNDDEL	BSS 2			* SOUND COUNTDOWN DELAY IN FRAMES
+OLDKEY	BSS 2			* used in KSCAN to calculate S properly
+STRBUF	BSS 32			* STRING BUFFER (1 LINE)
+ENDVARS BSS 2			* just dummy so the listing file has an address
+
+* Cartridge Header (if cart, not used for MM)
+		AORG >6000
+
+* PROGRAMS ARE LISTED IN REVERSE ORDER
+		
+		DATA >AA01,>0200,>0000,PROG1,>0000,>0000
+PROG1	DATA >0000,GOGAME,>0548
+		TEXT 'EROX'
+		EVEN
+
+* start in MiniMem RAM range
+		DEF GOGAME
+* todo: enable when it fits in 4k ;)
+*		AORG >7000
+
+HEROX	TEXT 'HERO+'
+		EVEN
+		
+PRESSFIRE
+		TEXT 'PRESS FIRE BUTTON TO PLAY.+'
+		EVEN
+		
+GAMEOVER
+		TEXT 'GAME OVER+'
+		EVEN
+
+BONUS
+		TEXT 'BONUS= 100 X+'
+		EVEN
+		
+HELPHELP
+		TEXT 'HELP+'
+FFBYTE
+		BYTE >FF
+		EVEN
+		
+CHARDAT1	
+		DATA >1038,>1010,>1810,>1018,>1038,>1010,>1810,>2844
+		data >081C,>0808,>1808,>0818,>081C,>0808,>1808,>1422
+		data >243C,>3C3C,>1818,>2424,>0000,>0000,>0000,>1866
+		data >0010,>3AFE,>3B11,>0000,>0008,>5C7F,>DC88,>0000
+		DATA >0000,>007E,>FFFF,>FFFF,>FF3C,>42A5,>A542,>3CFF
+		data >4428,>1010,>7C92,>3810,>183C,>282E,>081C,>3E14
+		DATA >1818,>3C18,>08F8,>0814,>3030,>7830,>9070,>1028
+		data >2418,>187E,>99BD,>1818,>081C,>0808,>0C08,>0818
+		data >0000,>3E22,>2A22,>3E00,>1038,>1010,>F010,>3050
+		data >66FF,>FFFF,>7E3C,>1800
+		
+CHARDAT2
+		data >FFFE,>FFFE,>FFFE,>FFFE,>FFFE,>FCF1,>F1FC,>FEFF
+		
+CHARDAT3
+		data >7E42,>4242,>7E42,>4242
+	
+GOGAME	
+		LIMI 0				* disable interrupts
+		LWPI >8300			* set correct workspace
+		LI R8,1				* we reserve R8 to always be the value '1' to save some memory
+		LI R5,wradr			* R5 for wradr
+		LI R6,coinc			* r6 for coinc
+		LI R7,pattern		* r7 for pattern
+
+* inline initvdp
+* Set GR0 mode similar to XB
+		LI R12,>8000
+		LI R13,VDPTAB
+		LI R10,8
+INITL1
+		MOVB *R13+,@>8319	* R12 LSB
+		bl *r5
+		AI R12,>0100
+		DEC R10
+		JNE INITL1
+		
+		LI R12,>E100	* 16k, screen on, ints on, magnify 1 (differs from XB)
+		MOVB R12,@>83d4 * also put VDP R1 at the KSCAN reload
+
+* we won't call CLEAR, user can do that, but we do
+* need to wipe the sprite table
+		LI R12,>4300
+		bl *r5
+		LI R12,>D000
+		LI R13,128
+		BL @VDPSET
+* and the automotion table
+		LI R12,>4780
+		bl *r5
+		CLR R12
+		LI R13,128
+		BL @VDPSET
+* and set the color table to all black on trans
+		LI R12,>5000
+		bl *r5
+		LI R12,>1000
+		LI R13,32
+		BL @VDPSET
+* AND CLEAR ANY SOUND DELAY COUNTER
+		CLR @SNDDEL
+
+		LI R0,>1F00
+		MOVB R0,@>837A	* automotion limit
+
+*1 CALL SCREEN(15)		* in the VDP init
+
+*10 CALL INIT		- not the XB init, my own sub!
+* inline init	
+*10005 CALL COLOR(10,7,1,11,14,1,12,2,1,13,11,1)
+	li r12,>500D
+	bl *r5
+	li r12,CDAT
+	li r13,4
+	bl @vdpcpy
+	
+*10010 RESTORE		* oh, goodie... data
+*10020 FOR A=96 TO 114
+*10030 READ A$ :: CALL CHAR(A,A$)
+*10040 NEXT A
+	li r0,96
+	li r1,CHARDAT1
+	li r2,152
+	bl @char
+	
+*10050 CALL CHAR(120,"FFFEFFFEFFFEFFFEFFFEFCF1F1FCFEFF")
+	li r0,120
+	li r1,CHARDAT2
+	li r2,16
+	bl @char
+	
+*10060 CALL CHAR(128,"7E4242427E424242")
+	li r0,128
+	li r1,CHARDAT3
+	li r2,8
+	bl @char
+
+*10120 SUBEND
+
+*20 CALL CLEAR
+l20
+		BL @CLEAR
+
+*25 CALL DELSPRITE(ALL)
+		BL @DSPRALL
+
+*30 CALL MAGNIFY(2)
+* already done in the VDP Init
+
+*40 CALL HCHAR(11,14,105,6)
+*50 CALL HCHAR(13,14,105,6)
+
+		bl @hcharf
+		byte 11,14,105,6
+		byte 13,14,105,6
+		byte 0,0
+
+*60 CALL VCHAR(11,14,105,3)
+*70 CALL VCHAR(11,19,105,3)
+
+		bl @vcharf
+		byte 11,14,105,3
+		byte 11,19,105,3
+		byte 0,0
+
+*80 DISPLAY AT(12,13)SIZE(4):"HERO"
+		li r0,HEROX
+		li r1,12
+		li r2,13
+		bl @display
+
+*90 DISPLAY AT(23,1):"PRESS FIRE BUTTON TO PLAY."
+		li r0,PRESSFIRE
+		li r1,23
+		mov r8,r2	(1)
+		bl @display
+
+*100 CALL KEY(1,K,S)
+*110 IF K=18 THEN C=1 :: GOTO 140 (not doing c)
+*130 IF K<>18 THEN 100
+l100
+		bl @waitnewkey
+
+*140 LE=1 :: NM=3 :: SC=0
+	mov r8,@le
+	li r0,3
+	mov r0,@nm
+	clr @sc
+
+*150 CALL DELSPRITE(ALL)
+l150
+	BL @DSPRALL
+
+*155 AS=0
+	clr @as
+
+*157 NW=0
+	clr @nw
+
+*160 CALL DRAW(LE) - this is the only call
+	bl @draw
+
+*162 CALL HCHAR(23,4,97,NM)
+	li r0,23
+	li r1,4
+	li r2,97
+	mov @nm,r3
+	bl @hchar
+
+*165 DISPLAY AT(24,1):SC
+	mov @sc,r0
+	li r1,24
+	li r2,1
+	bl @disnum
+
+*170 CALL SHAPES(LE) - this is the only call
+l170
+	bl @shapes
+
+*180 CALL SPRITE(#1,96,16,152,32)
+	mov r8,r0
+	li r1,96
+	li r2,16
+	li r3,152
+	li r4,32
+	bl @sprite
+
+*190 CALL KEY(C,K,S) :: IF K<>18 THEN 190 - ignoring c
+l190
+	bl @waitnewkey
+
+*200 CALL COLOR(#1,2)
+* Inline SPcolor
+	LI R12,>4303      * address of sprite 1 color for write
+	bl *r5
+	MOVB @>8311,R12    * R8 LSB to R12 MSB for color 1
+	MOVB R12,@>8C00
+
+*210 CALL JOYST(C,X,Y)
+l210
+	bl @scan
+* inline joyst
+	clr r1
+	movb @>8377,r1
+	sra r1,8        * sign extend!
+	mov r1,@x
+	movb @>8376,r1
+	sra r1,8        * sign extend!
+	mov r1,@y
+
+* don't have RND, so using sprite 4 col instead
+*211 IF LE=5 THEN CALL PATTERN(#2,108+RND)
+	mov @le,r3
+	ci r3,5
+	jne l212
+	li r0,4
+	bl @position
+	srl r2,2
+	andi r2,1
+	ai r2,108
+	mov r2,r1
+	li r0,2
+	bl *r7
+l212
+
+*212 IF X=0 AND Y=0 THEN GOTO 300
+* omitted for ROM space
+
+*215 IF X=0 THEN 230
+	mov @x,r0
+	jeq l230
+
+*217 CALL POSITION(#1,RO,CO)
+	mov r8,r0
+	bl @position
+	mov r1,@ro
+	mov r2,@co
+
+*220 CO=CO+X*2 :: if CO<1 or CO>255 then 225
+	mov @x,r3
+	a r3,r2		  * just add twice, because
+	a r3,r2		  * SLA and a 16-bit value don't work for negative
+	jeq l225	  * handles 0
+	ci r2,248
+	jh l225		  * handles > 248 or negative (255 was uneven)
+
+*221 CALL LOCATE(#1,RO,CO)
+	bl @locate
+
+*225 AS=AS=0
+l225
+	inv @as
+
+*228 CALL PATTERN(#1,96-2*(X=-4)-AS)
+	li r1,96
+*	mov @x,r0	* @X is still in r3
+	ci r3,-4
+	jne l228b
+	inct r1
+l228b
+	s @as,r1
+	mov r8,r0
+	bl *r7
+
+*230 IF Y=0 THEN 300
+l230
+	mov @y,r0
+	jeq l300
+
+*250 CALL POSITION(#1,RO,CO)
+	mov r8,r0
+	bl @position
+	mov r1,@ro
+	mov r2,@co
+
+*260 CALL GCHAR(RO/8+1-2*(Y=-4),CO/8+1,QW)
+	bl @pix2char
+	mov @y,r2
+	ci r2,-4
+	jne l260b
+	inct r0
+l260b
+	bl @gchar
+
+*270 IF QW=128 THEN CALL PATTERN(#1,100) :: CALL POSITION(#1,RO,CO) :: RO=RO-Y*2 :: RO=RO-(RO=0) :: CALL LOCATE(#1,RO,CO)
+	ci r2,128
+	jne l300
+
+	mov r8,r0
+	li r1,100
+	bl *r7
+	
+	mov r8,r0
+	bl @position
+
+	s @y,r1
+	s @y,r1
+	
+	jne l270b
+	inc r1
+l270b
+
+	bl @locate
+
+*300 CALL KEY(C,K,S) :: IF K<>18 THEN 400
+l300
+	bl @key      * scan was already done above
+	ci r1,18
+	jeq l300b
+	b @l400
+l300b
+
+*310 REM  JUMP*********
+*320 CALL POSITION(#1,RO,CO)
+	mov r8,r0
+	bl @position
+	mov r1,@ro
+	mov r2,@co
+
+*330 CALL SOUND(100,-3,15)
+	li r0,100
+	li r1,-3
+	li r2,15
+	bl @sound
+
+* upward part of jump - just do it
+*335 FOR A=1 TO 4
+	mov r8,@a
+l335b
+	mov @a,r0
+	ci r0,4
+	jh l350b
+
+*340 RO=RO-4 :: IF RO<1 THEN RO=1
+	mov @ro,r0
+	dect r0
+	dect r0
+	mov r0,r0
+	jgt l340b
+	mov r8,r0
+l340b
+	mov r0,@ro
+
+*341 CALL COINC(ALL,QW) :: IF QW THEN 2000
+	bl *r6
+	mov r0,r0
+	jeq l341b
+	b @l2000
+l341b
+
+*345 CO=CO+X :: IF CO>235 OR CO<5 THEN CO=CO-X
+  a @x,@co
+  mov @co,r0
+  ci r0,235
+  jh l345b
+  ci r0,5
+  jl l345b
+  jmp l347
+l345b
+	s @x,@co
+
+*347 CALL LOCATE(#1,RO,CO)
+l347
+	mov r8,r0
+	mov @ro,r1
+	mov @co,r2
+	bl @locate
+
+*350 NEXT A
+	inc @a
+	jmp l335b
+l350b
+
+* if we are now standing on something, don't come down
+*360 CALL GCHAR(RO/8+3,CO/8+1,QW) :: IF QW<>32 THEN 400
+	bl @pix2char
+	inct r0
+	bl @gchar
+	ci r2,32
+	jne l400
+	
+* Now move down - we jumped up 4 steps (2 chars)
+* we are allowed to jump down total of 6 steps (3 chars)
+* any more than that, we will fall
+* todo: change this jump for gravity and allow a bit longer falls
+* could also simplify this, it was broken up for performance, but
+* we are fast enough to check every step now...
+*365 FOR B=1 TO 3		* 3 chars
+	mov r8,@b
+l365b
+	mov @b,r0
+	ci r0,3
+	jh l394b
+
+*370 FOR A=1 TO 2		* at 4 pixels each, so 2 steps is 1 char
+	mov r8,@a
+l370b
+	mov @a,r0
+	ci r0,2
+	jh l391b
+
+*380 RO=RO+4 :: CO=CO+X :: IF CO>235 OR CO<5 THEN CO=CO-X
+	li r0,4
+	a r0,@ro
+	a @x,@co
+
+  mov @co,r0
+  ci r0,235
+  jh l380b
+  ci r0,5
+  jl l380b
+  jmp l380c
+l380b
+	s @x,@co
+l380c
+
+* deliberately moved before coinc (delay, etc)
+*390 CALL LOCATE(#1,RO,CO)
+	mov r8,r0
+	mov @ro,r1
+	mov @co,r2
+	bl @locate
+	
+*385 CALL COINC(ALL,QW) :: IF QW THEN 2000
+	bl *r6
+	mov r0,r0
+	jeq l385b
+	b @l2000
+l385b
+
+*391 NEXT A
+	inc @a
+	jmp l370b
+l391b
+
+* we've moved 8 pixels, check ground char
+* this also checks (b=2) if we are done the jump but didn't land
+*392 CALL GCHAR(RO/8+3,CO/8+1,QW) :: IF QW=32 AND B=2 THEN 2000
+	bl @pix2char
+	inct r0
+	bl @gchar
+	ci r2,32
+	jne l392b
+	mov @b,r0
+	ci r0,2
+	jne l392b
+	b @l2000
+l392b
+
+* this checks if we landed and jumps out of the loop if so	
+*393 IF QW<>32 THEN 400
+	ci r2,32
+	jne l400
+	
+*394 NEXT B
+	inc @b
+	jmp l365b
+l394b
+
+* not jumping, so check for wafer (thus +2, not +3)
+*400 CALL POSITION(#1,RO,CO) :: RO=RO/8+2 :: CO=CO/8+1
+* if we got the wafer, do all this
+*410 CALL GCHAR(RO,CO,QW) :: IF QW=112 THEN CALL HCHAR(RO,CO,32) :: CALL SOUND(100,550,0) :: NW=NW+1 :: SC=SC+50 :: DISPLAY AT(24,1):SC
+l400
+	mov r8,r0
+	bl @position
+	mov r1,@ro
+	mov r2,@co
+	bl @pix2char
+	inc r0
+	mov r0,@ro
+	mov r1,@co
+
+	bl @gchar
+	mov r2,@qw
+	
+	ci r2,112
+	jne l410b
+	
+	mov @ro,r0		* erase wafer
+	mov @co,r1
+	li r2,32
+	bl @hchar1
+	
+	li r0,100		* make tone
+	li r1,550
+	li r2,0
+	bl @sound
+	
+	inc @nw			* count collected wafers
+	
+	li r0,50		* add to score
+	a r0,@sc
+	
+	mov @sc,r0		* display new score
+	li r1,24
+	li r2,1
+	bl @disnum
+l410b
+
+* check for ladder appearance (easier to cheat if it's not after the inc)
+*420 IF NW<4 THEN 440
+	mov @nw,r0
+	ci r0,4
+	jl l440
+	
+* Check if ladder (fixed location) needs to be drawn
+* any object there prevents it!
+*421 CALL GCHAR(1,5,QW) :: IF QW<>32 THEN 440
+	mov r8,r0
+	li r1,5
+	bl @gchar
+	ci r2,32
+	jne l440
+
+* set up loop to draw ladder as far as necessary
+*425 RO=1 :: CO=5
+	mov r8,@ro
+	li r0,5
+	mov r0,@co
+
+* the actual loop is here - draw till we hit something (anything)
+*430 CALL GCHAR(RO,CO,QW) :: IF QW=32 THEN CALL HCHAR(RO,CO,128) :: RO=RO+1 :: GOTO 430
+l430
+	mov @ro,r0
+	mov @co,r1
+	bl @gchar
+	ci r2,32
+	jne l430b
+	
+	li r2,128
+	bl @hchar1
+	
+	inc @ro
+	jmp l430
+l430b	
+
+* main game loops around here
+*435 GOTO 210
+l435
+	b @l210
+
+* if no ladder draw, then we come here
+* if row (character) is less than 3, then we must have climbed to the top - do win routine
+* todo: change to require punching bad guy, then ladder to damsel appears
+* - but only if we have space. It's not bad as-is
+* - ladder routine will need a separate draw for the final stage
+*440 IF RO<3 THEN 1000
+l440
+	mov @ro,r0
+	ci r0,3
+	jl l1000
+
+* check for ground underneath character - if none, die
+* todo: allow a limited fall with gravity
+* todo: if a wafer is underneath, collect it and drop, right now we die if we land on a wafer
+* and then try to step off it.
+*450 CALL GCHAR(RO+1,CO,QW) :: IF QW=32 THEN 2000
+	mov @ro,r0
+	inc r0
+	mov @co,r1
+	bl @gchar
+	ci r2,32
+	jne l450b
+	b @l2000
+l450b	
+
+*460 CALL COINC(ALL,QW) :: IF QW THEN 2000
+	bl *r6
+	mov r0,r0
+	jeq l460b
+	b @l2000
+l460b
+	
+*470 GOTO 210
+	b @l210
+	
+*1000 REM  NEXT LEVEL
+l1000
+
+*1010 LE=LE+1
+	inc @le
+	
+*1015 IF LE=6 THEN 4000
+	mov @le,r0
+	ci r0,6
+	jne l1015b
+	b @l4000
+l1015b
+
+*1020 GOTO 150
+	b @l150
+	
+*2000 REM  DIED!
+l2000
+
+*2005 FOR A=4 TO 16 :: CALL MOTION(#A,0,0) :: NEXT A
+	li r0,4
+	mov r0,@a
+l2005b
+	mov @a,r0
+	ci r0,16
+	jh l2005c
+	
+	mov @a,r0
+	clr r1
+	clr r2
+	bl @motion
+	
+	inc @a
+	jmp l2005b
+l2005c
+
+* I like it the way it is, sound effect, then fall. Lets you see what killed you.
+*2010 FOR A=990 TO 110 STEP-110 :: CALL SOUND(-100,A,0) :: NEXT A
+	li r0,990
+	mov r0,@a
+l2010b
+	mov @a,r0
+	ci r0,110
+	jl l2010c
+	
+	li r0,-100
+	mov @a,r1
+	clr r2
+	bl @sound
+	bl *r6		* delay
+	
+	li r0,-110
+	a r0,@a
+	jmp l2010b
+l2010c
+
+* falling here
+*2020 CALL PATTERN(#1,106) :: CALL MOTION(#1,16,0)
+	mov r8,r0
+	li r1,106
+	bl *r7
+	
+	li r1,16
+	clr r2
+	bl @motion
+
+*2030 CALL POSITION(#1,RO,CO) :: IF RO<200 THEN 2030
+l2030	
+	bl *r6			* we insert a coinc call to make our framing work
+	mov r8,r0
+	bl @position
+	ci r1,200
+	jl l2030
+
+*2040 CALL DELSPRITE(ALL)
+	bl @dsprall
+	
+*2045 CALL HCHAR(23,4,32,5)
+	bl @hcharf
+	byte 23,4,32,5,0,0
+
+*2050 NM=NM-1 :: CALL HCHAR(23,4,97,NM)
+	dec @nm
+	li r0,23
+	li r1,4
+	li r2,97
+	mov @nm,r3
+	bl @hchar
+
+*2060 IF NM=0 THEN 3000
+	mov @nm,r0
+	jeq l3000
+
+*2070 GOTO 170
+	b @l170
+	
+* game over!	
+*3000 FOR A=1990 TO 110 STEP-110 :: CALL SOUND(-100,A,0,A*2,0) :: NEXT A
+l3000
+	li r0,1990
+	mov r0,@a
+l3000b
+	mov @a,r0
+	ci r0,110
+	jl l3000c
+	
+	li r0,-100
+	mov @a,r1
+	clr r2
+* voice 2 not supported yet
+*	mov @a,r3
+*	sla r3,1
+*	clr r4
+	bl @sound
+	bl *r6			* delay
+	
+	li r0,-110
+	a r0,@a
+	jmp l3000b
+l3000c
+
+*3010 DISPLAY AT(12,8):"GAME OVER"
+	li r0,gameover
+	li r1,12
+	li r2,8
+	bl @display
+	
+*3020 FOR A=1 TO 50 :: CALL KEY(C,K,S)
+	mov r8,@a
+l3020b
+	mov @a,r0
+	ci r0,50
+	jh l3040b
+
+	bl *r6			* slow it down a bit, this is just a timeout delay
+	bl @scan
+	bl @key
+	
+*3030 IF K=18 THEN 20
+	ci r1,18
+	jne l3040
+	b @l20
+	
+*3040 NEXT A :: GOTO 20
+l3040
+	inc @a
+	jmp l3020b
+l3040b
+	b @l20
+	
+* play a little win chime	
+*4000 FOR A=550 TO 1010 STEP 110 :: CALL SOUND(-100,A,0) :: NEXT A
+l4000
+	li r0,550
+	mov r0,@a
+l4000b
+	mov @a,r0
+	ci r0,1010
+	jh l4000c
+	
+	li r0,-100
+	mov @a,r1
+	clr r2
+	bl @sound
+	bl *r6		* delay
+	
+	li r0,110
+	a r0,@a
+	jmp l4000b
+l4000c
+
+* back down the ladder
+*4010 FOR A=1 TO 4 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO+8,CO) :: FOR B=1 TO 40 :: NEXT B :: NEXT A
+	mov r8,@a
+l4010b
+	mov @a,r0
+	ci r0,4
+	jh l4010c
+	
+	mov r8,r0
+	bl @position
+	ai r1,8
+	bl @locate
+	
+	bl *r6				* coinc for delay instead
+	
+	inc @a
+	jmp l4010b
+l4010c
+
+*4015 CALL PATTERN(#1,99)
+	mov r8,r0
+	li r1,99
+	bl *r7
+
+* walk to the villian
+*4020 FOR A=1 TO 13 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO-8) :: CALL PATTERN(#1,98+AN) :: AN=-(AN=0) :: FOR B=1 TO 40 :: NEXT B :: NEXT A
+	mov r8,@a
+l4020b
+	mov @a,r0
+	ci r0,13
+	jh l4020c
+	
+	mov r8,r0
+	bl @position
+	ai r2,-8
+	bl @locate
+	
+	mov r8,r0
+	li r1,98
+	s @as,r1			* screw AN, I'm using AS
+	bl *r7
+	
+	inv @as
+	
+	bl *r6			* coinc for delay instead
+	
+	inc @a
+	jmp l4020b
+l4020c
+	
+* prepare to punch
+*4030 CALL PATTERN(#1,111) :: FOR A=1 TO 200 :: NEXT A
+	mov r8,r0
+	li r1,111
+	bl *r7
+
+	li r0,5
+	bl @cdelay
+
+* punch
+*4040 CALL PATTERN(#1,113) :: CALL SOUND(100,-6,10)
+	mov r8,r0
+	li r1,113
+	bl *r7
+	
+	li r0,100
+	li r1,-6
+	li r2,10
+	bl @sound
+	bl *r6			* delay
+
+* drop villian
+*4050 CALL PATTERN(#2,110) :: CALL MOTION(#2,18,0)
+	li r0,2
+	li r1,110
+	bl *r7
+	
+	li r1,18
+	clr r2
+	bl @motion
+
+	bl *r6			* delay
+
+* unpunch
+*4060 CALL PATTERN(#1,98)
+	mov r8,r0
+	li r1,98
+	bl *r7
+
+* wait for villian fall to end
+*4070 CALL POSITION(#2,RO,CO) :: IF RO<200 THEN 4070
+l4070
+	bl *r6			* run plus delay
+
+	li r0,2
+	bl @position
+	ci r1,200
+	jl l4070
+
+* delete villian
+*4080 CALL DELSPRITE(#2)
+	li r0,2
+	bl @delspr
+	
+* move up to machine	
+*4090 CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO-8)
+	mov r8,r0
+	bl @position
+	mov r1,@ro
+	mov r2,@co
+	ai r2,-8
+	bl @locate
+	bl *r6
+
+*4100 CALL LOCATE(#1,RO,CO-16)
+	mov r8,r0
+	mov @ro,r1
+	mov @co,r2
+	ai r2,-16
+	bl @locate
+	bl *r6
+	
+* wait	
+*4110 FOR A=1 TO 200 :: NEXT A
+	li r0,5
+	bl @cdelay
+	
+* display '?'	
+*4120 CALL HCHAR(4,5,63) :: FOR A=1 TO 300 :: NEXT A :: CALL HCHAR(4,5,32)
+	bl @hcharf
+	byte 4,5,63,1,0,0
+	
+	li r0,7
+	bl @cdelay
+	
+	bl @hcharf
+	byte 4,5,32,1,0,0
+	
+	bl *r6
+
+* prepare to punch
+*4130 CALL PATTERN(#1,111)
+	mov r8,r0
+	li r1,111
+	bl *r7
+
+*4140 FOR A=1 TO 50 :: NEXT A
+	bl *r6
+
+* punch
+*4150 CALL PATTERN(#1,113)
+	mov r8,r0
+	li r1,113
+	bl *r7
+	
+*4160 CALL SOUND(100,-6,4)
+	li r0,100
+	li r1,-6
+	li r2,4
+	bl @sound
+	bl *r6
+	
+* break machine and unpunch	
+*4170 CALL HCHAR(6,3,121) :: CALL PATTERN(#1,98)
+* erase 'help'
+*4175 DISPLAY AT(1,10):"    ";
+	bl @hcharf
+	byte 6,3,121,1
+	byte 1,12,32,4,0,0
+	
+	mov r8,r0
+	li r1,98
+	bl *r7
+	
+* turn off all the enemies	
+*4180 FOR A=4 TO 16 :: CALL DELSPRITE(#A) :: NEXT A
+	li r0,4
+	mov r0,@a
+l4180b
+	mov @a,r0
+	ci r0,16
+	jh l4180c
+	
+	bl @delspr
+	
+	inc @a
+	jmp l4180b
+l4180c
+
+* move back to ladder
+*4190 FOR A=1 TO 15 :: CALL PATTERN(#1,96+AN) :: AN=-(AN=0) :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO+8) :: FOR B=1 TO 50 :: NEXT B :: NEXT A
+	mov r8,@a
+l4190b	
+	mov @a,r0
+	ci r0,15
+	jh l4190c
+	
+	mov r8,r0
+	li r1,96
+	s @as,r1
+	bl *r7
+	
+	inv @as
+	
+	mov r8,r0
+	bl @position
+	ai r2,8
+	bl @locate
+	
+	bl *r6
+	
+	inc @a
+	jmp l4190b
+l4190c
+
+*4200 CALL PATTERN(#1,100)
+	mov r8,r0
+	li r1,100
+	bl *r7
+	
+* move up ladder
+*4210 FOR A=1 TO 4 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO-8,CO) :: FOR B=1 TO 20 :: NEXT B :: NEXT A
+	mov r8,@a
+l4210b
+	mov @a,r0
+	ci r0,4
+	jh l4210c
+	
+	mov r8,r0
+	bl @position
+	ai r1,-8
+	bl @locate
+	
+	bl *r6
+	
+	inc @a
+	jmp l4210b
+l4210c
+
+*4220 CALL PATTERN(#1,98)
+	mov r8,r0
+	li r1,98
+	bl *r7
+
+* move to girl
+*4230 FOR A=1 TO 4 :: CALL POSITION(#3,RO,CO) :: CALL LOCATE(#3,RO,CO-8) :: FOR B=1 TO 75 :: NEXT B :: NEXT A
+	mov r8,@a
+l4230b
+	mov @a,r0
+	ci r0,4
+	jh l4230c
+	
+	mov r8,r0
+	bl @position
+	ai r2,-8
+	bl @locate
+	
+	bl *r6
+	bl *r6
+	
+	inc @a
+	jmp l4230b
+l4230c
+
+* heart <3
+*4240 CALL SPRITE(#4,114,9,1,94)
+	li r0,4
+	li r1,114
+	li r2,9
+	mov r8,r3
+	li r4,94
+	bl @sprite
+
+*4250 B=330
+	li r0,330
+	mov r0,@b
+	
+* pointless happy tune	
+*4260 FOR A=1 TO 3
+	mov r8,@a
+l4260b
+	mov @a,r0
+	ci r0,3
+	jh l4320b
+
+*4270 CALL SOUND(300,B,0)
+	li r0,300
+	mov @b,r1
+	clr r2
+	bl @sound
+	
+*4280 CALL SOUND(300,B+55,0)
+	ai r1,55
+	bl @sound
+
+*4290 CALL SOUND(300,B+20,0)
+	ai r1,-35
+	bl @sound
+	
+*4300 CALL SOUND(300,B+75,0)
+	ai r1,55
+	bl @sound
+	
+*4310 B=B+110
+	li r0,110
+	a r0,@b
+	
+*4320 NEXT A
+	inc @a
+	jmp l4260b
+l4320b
+
+*4330 CALL SOUND(300,B+110,0)
+	li r0,300
+	mov @b,r1
+	ai r1,110
+	clr r2
+	bl @sound
+	
+*4340 CALL SOUND(300,B,0)
+	ai r1,-110
+	bl @sound
+	
+*4350 CALL SOUND(300,B-110,0)
+	ai r1,-110
+	bl @sound
+	
+*4360 FOR A=1 TO 300 :: NEXT A
+	li r0,7
+	bl @cdelay
+	
+*4370 DISPLAY AT(9,10):"BONUS= 100 X"
+	li r0,bonus
+	li r1,9
+	li r2,10
+	bl @display
+
+*4380 CO=25
+	li r0,25
+	mov r0,@co
+	
+*4390 FOR A=1 TO NM :: CALL SOUND(100,1000,0) :: CALL HCHAR(9,CO,97) :: SC=SC+100 :: DISPLAY AT(24,1):SC
+	mov r8,@a
+l4390b
+	mov @a,r0
+	c r0,@nm
+	jh l4400b
+	
+	li r0,100
+	li r1,1000
+	clr r2
+	bl @sound
+	
+	li r0,9
+	mov @co,r1
+	li r2,97
+	bl @hchar1
+	
+	li r0,100
+	a r0,@sc
+	
+	mov @sc,r0
+	li r1,24
+	li r2,1
+	bl @disnum
+	
+*4400 CALL HCHAR(23,4,32,5) :: NM=NM-1 :: CALL HCHAR(23,4,97,NM) :: CO=CO+1 :: NEXT A
+	bl @hcharf
+	byte 23,4,32,5,0,0
+	
+	dec @nm
+	
+	li r0,23
+	li r1,4
+	li r2,97
+	mov @nm,r3
+	bl @hchar
+	
+	inc @co
+	
+	inc @a
+	jmp l4390b
+l4400b
+	
+*4410 FOR A=1 TO 1000 :: CALL KEY(C,K,S) :: IF K=18 THEN 20
+	mov r8,@a
+l4410b
+	mov @a,r0
+	ci r0,1000
+	jh l4420b
+	
+	bl *r6			* slow it down a bit, this is just a timeout delay
+	bl @scan
+	bl @key
+	ci r1,18
+	jne l4420
+	b @l20
+
+*4420 NEXT A :: GOTO 20
+l4420
+	inc @a
+	jmp l4410b
+l4420b
+	b @l20
+	
+* replacing subs with gosub...
+
+*10000 SUB INIT
+CDAT BYTE >60,>D0,>10,>a0
+
+*10130 SUB DRAW(X) - always LE
+DRAW
+	mov r11,r15
+
+*10135 CALL CLEAR
+	bl @clear
+	
+*10140 ON X GOTO 10160,10300,10400,10500,10600
+	mov @le,r0
+	dec r0
+	sla r0,1
+	ai r0,JTABLE
+	mov *r0,r0
+	b *r0
+
+JTABLE
+	DATA l10160,l10300,l10400,l10500,l10600
+
+*10160 CALL HCHAR(5,1,105,32)
+*10170 CALL HCHAR(10,1,105,32)
+*10180 CALL HCHAR(15,1,105,32)
+*10190 CALL HCHAR(22,1,105,32)
+*10240 CALL HCHAR(4,5,112)
+*10250 CALL HCHAR(9,30,112)
+*10260 CALL HCHAR(14,3,112)
+*10270 CALL HCHAR(21,30,112)
+l10160
+	bl @hcharf
+	byte 5,1,105,32
+	byte 10,1,105,32
+	byte 15,1,105,32
+	byte 22,1,105,32
+	byte 4,5,112,1
+	byte 9,30,112,1
+	byte 14,3,112,1
+	byte 21,30,112,1
+	byte 0,0
+		
+*10210 CALL VCHAR(4,29,128,6)
+*10220 CALL VCHAR(9,4,128,6)
+*10230 CALL VCHAR(14,29,128,8)
+	bl @vcharf
+	byte 4,29,128,6
+	byte 9,4,128,6
+	byte 14,29,128,8
+	byte 0,0
+	
+*10280 SUBEXIT
+	b *r15
+	
+*10300 CALL HCHAR(5,1,105,32)
+*10310 CALL HCHAR(10,1,105,32)
+*10320 CALL HCHAR(15,1,105,32)
+*10330 CALL HCHAR(22,1,105,32)
+*10350 CALL HCHAR(4,27,112)
+*10360 CALL HCHAR(9,27,112)
+*10370 CALL HCHAR(14,27,112)
+*10380 CALL HCHAR(21,27,112)
+l10300
+	bl @hcharf
+	byte 5,1,105,32
+	byte 10,1,105,32
+	byte 15,1,105,32
+	byte 22,1,105,32
+	byte 4,27,112,1
+	byte 9,27,112,1
+	byte 14,27,112,1
+	byte 21,27,112,1
+	byte 0,0
+
+*10340 CALL VCHAR(3,5,128,19)
+	bl @vcharf
+	byte 3,5,128,19
+	byte 0,0
+	
+*10390 SUBEXIT
+	b *r15
+	
+*10400 CALL HCHAR(4,1,105,32)
+*10405 CALL HCHAR(10,1,105,32)
+*10410 CALL HCHAR(17,1,105,32)
+*10415 CALL HCHAR(22,3,105,6)
+*10420 CALL HCHAR(21,11,105,6)
+*10425 CALL HCHAR(20,19,105,6)
+*10445 CALL HCHAR(3,31,112)
+*10450 CALL HCHAR(9,2,112)
+*10455 CALL HCHAR(16,30,112)
+*10460 CALL HCHAR(20,14,112)
+l10400
+	bl @hcharf
+	byte 4,1,105,32
+	byte 10,1,105,32
+	byte 17,1,105,32
+	byte 22,3,105,6
+	byte 21,11,105,6
+	byte 20,19,105,6
+	byte 3,31,112,1
+	byte 9,2,112,1
+	byte 16,30,112,1
+	byte 20,14,112,1
+	byte 0,0
+	
+*10430 CALL VCHAR(3,29,128,7)
+*10435 CALL VCHAR(9,4,128,8)
+*10440 CALL VCHAR(16,23,128,4)
+	bl @vcharf
+	byte 3,29,128,7
+	byte 9,4,128,8
+	byte 16,23,128,4
+	byte 0,0
+	
+*10465 SUBEXIT
+	b *r15
+
+*10500 CALL HCHAR(4,7,105,12)
+*10505 CALL HCHAR(4,21,105,4)
+*10510 CALL HCHAR(4,27,105,4)
+*10515 CALL HCHAR(7,3,105,6)
+*10520 CALL HCHAR(7,11,105,20)
+*10525 CALL HCHAR(10,1,105,32)
+*10530 CALL HCHAR(14,3,105,22)
+*10535 CALL HCHAR(14,27,105,4)
+*10540 CALL HCHAR(20,15,105,10)
+*10545 CALL HCHAR(21,9,105,10)
+*10550 CALL HCHAR(22,3,105,10)
+*10575 CALL HCHAR(13,4,112)
+*10580 CALL HCHAR(6,28,112)
+*10585 CALL HCHAR(3,23,112)
+*10590 CALL HCHAR(3,29,112)
+l10500
+	bl @hcharf
+	byte 4,7,105,12
+	byte 4,21,105,4
+	byte 4,27,105,4
+	byte 7,3,105,6
+	byte 7,11,105,20
+	byte 10,1,105,32
+	byte 14,3,105,22
+	byte 14,27,105,4
+	byte 20,15,105,10
+	byte 21,9,105,10
+	byte 22,3,105,10
+	byte 13,4,112,1
+	byte 6,28,112,1
+	byte 3,23,112,1
+	byte 3,29,112,1
+	byte 0,0
+	
+*10555 CALL VCHAR(3,8,128,4)
+*10560 CALL VCHAR(6,5,128,4)
+*10565 CALL VCHAR(9,29,128,5)
+*10570 CALL VCHAR(13,23,128,7)
+*10573 CALL VCHAR(3,30,128,4)
+	bl @vcharf
+	byte 3,8,128,4
+	byte 6,5,128,4
+	byte 9,29,128,5
+	byte 13,23,128,7
+	byte 3,30,128,4
+	byte 0,0
+	
+*10595 SUBEXIT
+	b *r15
+	
+*10600 CALL HCHAR(3,9,105,12)
+*10605 CALL HCHAR(7,3,105,28)
+*10610 CALL HCHAR(12,3,105,28)
+*10615 CALL HCHAR(17,3,105,28)
+*10620 CALL HCHAR(22,3,105,28)
+l10600
+	bl @hcharf
+	byte 3,9,105,12
+	byte 7,3,105,28
+	byte 12,3,105,28
+	byte 17,3,105,28
+	byte 22,3,105,28
+	byte 0,0
+
+*10625 CALL VCHAR(2,19,128,5)
+*10630 CALL VCHAR(6,29,128,6)
+*10635 CALL VCHAR(11,4,128,6)
+*10640 CALL VCHAR(16,29,128,6)
+*10645 CALL VCHAR(4,3,120,3)
+	bl @vcharf
+	byte 2,19,128,5
+	byte 6,29,128,6
+	byte 11,4,128,6
+	byte 16,29,128,6
+	byte 4,3,120,3
+	byte 0,0
+	
+*10650 DISPLAY AT(1,10):"HELP"
+	li r0,helphelp
+	mov r8,r1
+	li r2,10
+	bl @display
+	
+*10655 SUBEND
+	b *r15
+	
+*10700 SUB SHAPES(X) - always 'LE'
+SHAPES
+	mov r11,r10
+
+*10710 ON X GOTO 10720,10800,10900,11000,12000
+	mov @le,r0
+	dec r0
+	sla r0,1
+	ai r0,JTAB2
+	mov *r0,r0
+	b *r0
+	
+JTAB2 data l10720,l10800,l10900,l11000,l12000
+
+*10720 FOR A=1 TO 3 :: CALL SPRITE(#A+3,101,5,16,A*80,0,5) :: NEXT A
+*10730 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,-5) :: NEXT A
+*10740 FOR A=1 TO 3 :: CALL SPRITE(#A+9,101,5,96,A*80,0,5) :: NEXT A
+*10750 FOR A=1 TO 3 :: CALL SPRITE(#A+12,101,5,152,A*80,0,-5) :: NEXT A
+*10760 SUBEXIT
+
+l10720
+	li r12,>430c
+	bl *r5
+	li r12,SDAT1
+	li r13,48
+	bl @vdpcpy
+	
+	LI R12,>478C
+	bl *r5
+	LI R12,>0000
+	LI R13,128
+	BL @VDPSET
+	
+	LI R12,>478D
+	LI R13,>0500
+	LI R14,3
+	li r15,4
+
+* write 4 sets of three, inverting 5/-5 each time
+l10720b
+	bl *r5
+	ai r12,4
+	movb r13,@>8c00
+	dec r14
+	jne l10720b
+	li r14,3
+	inv r13
+	ai r13,>0100		* byte-wise neg
+	dec r15
+	jne l10720b
+	
+	b *r10
+
+SDAT1
+	BYTE 14,80,101,5,14,160,101,5,14,240,101,5
+	byte 54,80,101,5,54,160,101,5,54,240,101,5
+	byte 94,80,101,5,94,160,101,5,94,240,101,5	
+	byte 150,80,101,5,150,160,101,5,150,240,101,5	
+
+*10800 FOR A=1 TO 2 :: CALL SPRITE(#A+3,101,5,16,A*100,0,5) :: NEXT A
+*10810 FOR A=1 TO 2 :: CALL SPRITE(#A+5,101,5,56,A*100,0,-5)
+*10815 NEXT A
+*10820 FOR A=1 TO 2 :: CALL SPRITE(#A+7,101,5,96,A*100,0,5) :: NEXT A
+*10830 FOR A=1 TO 2 :: CALL SPRITE(#A+9,101,5,152,A*100,0,-5) :: NEXT A
+*10840 SUBEXIT
+
+l10800
+	li r12,>430c
+	bl *r5
+	li r12,SDAT2
+	li r13,32
+	bl @vdpcpy
+	
+	LI R12,>478C
+	bl *r5
+	LI R12,>0000
+	LI R13,128
+	BL @VDPSET
+	
+	LI R12,>478D
+	LI R13,>0500
+	LI R14,2
+	li r15,4
+
+* write 4 sets of two, inverting 5/-5 each time
+l10800b
+	bl *r5
+	ai r12,4
+	movb r13,@>8c00
+	dec r14
+	jne l10800b
+	li r14,2
+	inv r13
+	ai r13,>0100		* byte-wise neg
+	dec r15
+	jne l10800b
+	
+	b *r10
+
+SDAT2
+	byte 14,100,101,5,14,200,101,5
+	byte 54,100,101,5,54,200,101,5
+	byte 94,100,101,5,94,200,101,5
+	byte 150,100,101,5,150,200,101,5
+
+*10900 FOR A=1 TO 3 :: CALL SPRITE(#A+3,101,5,8,A*80,0,5) :: NEXT A
+*10910 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,-5) :: NEXT A
+*10920 FOR A=1 TO 3 :: CALL SPRITE(#A+9,101,5,112,A*80,0,5) :: NEXT A
+*10930 CALL SPRITE(#13,103,3,136,100,0,-5)
+*10940 SUBEXIT
+
+l10900
+	li r12,>430c
+	bl *r5
+	li r12,SDAT3
+	li r13,40
+	bl @vdpcpy
+	
+	LI R12,>478C
+	bl *r5
+	LI R12,>0000
+	LI R13,128
+	BL @VDPSET
+	
+	LI R12,>478D
+	LI R13,>0500
+	LI R14,3
+	li r15,4
+
+* write 4 sets of three, inverting 5/-5 each time
+l10900b
+	bl *r5				* note: only 1 sprite in the last set, hopefully won't break ;)
+	ai r12,4
+	movb r13,@>8c00
+	dec r14
+	jne l10900b
+	li r14,3
+	inv r13
+	ai r13,>0100		* byte-wise neg
+	dec r15
+	jne l10900b
+	
+	b *r10
+
+SDAT3
+	byte 6,80,101,5,6,160,101,5,6,240,101,5
+	byte 54,80,101,5,54,160,101,5,54,240,101,5
+	byte 110,80,101,5,110,160,101,5,110,240,101,5
+	byte 134,100,103,3
+
+*11000 CALL SPRITE(#4,101,14,8,100)
+*11010 CALL SPRITE(#6,103,3,32,100,0,-5)
+*11020 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,5) :: NEXT A
+*11030 CALL SPRITE(#10,103,3,88,80,0,-5)
+*11040 SUBEXIT
+
+l11000
+	li r12,>430c
+	bl *r5
+	li r12,SDAT4
+	li r13,28
+	bl @vdpcpy
+	
+	LI R12,>478C
+	bl *r5
+	LI R12,>0000
+	LI R13,128
+	BL @VDPSET
+	
+	li r0,6
+	clr r1
+	li r2,-5
+	bl @motion
+	li r0,10
+	bl @motion
+	li r0,7
+	li r2,5
+	bl @motion
+	inc r0
+	bl @motion
+	inc r0
+	bl @motion
+	
+	b *r10
+
+SDAT4
+	byte 6,100,101,13,>d2,0,0,0,30,100,103,2
+	byte 54,80,101,4,54,160,101,4,54,240,101,4
+	byte 86,80,103,2
+
+*12000 CALL SPRITE(#2,108,2,32,24)
+*12010 CALL SPRITE(#3,107,10,1,72)
+*12020 CALL SPRITE(#4,102,3,56,100,0,5)
+*12030 FOR A=1 TO 2 :: CALL SPRITE(#A+4,104,15,81,A*80,0,-5) :: NEXT A
+*12040 CALL SPRITE(#7,103,3,96,100,0,-5)
+*12050 CALL SPRITE(#8,104,15,121,100,0,5)
+*12060 CALL SPRITE(#9,102,3,136,50,0,5)
+*12070 CALL SPRITE(#10,104,15,161,100,0,-5)
+*12080 SUBEND
+
+l12000
+	li r12,>4304
+	bl *r5
+	li r12,SDAT5
+	li r13,36
+	bl @vdpcpy
+	
+	LI R12,>4784
+	bl *r5
+	LI R12,>0000
+	LI R13,128
+	BL @VDPSET
+
+	li r0,4
+	clr r1
+	li r2,5
+	bl @motion
+	li r0,8
+	bl @motion
+	inc r0
+	bl @motion
+	li r2,-5
+	li r0,5
+	bl @motion
+	inc r0
+	bl @motion
+	inc r0
+	bl @motion
+	li r0,10
+	bl @motion
+	
+	b *r10
+
+SDAT5
+	byte 30,24,108,1,>ff,72,107,9,54,100,102,2
+	byte 79,80,104,14,79,160,104,14
+	byte 94,100,103,2,119,100,104,14,134,50,102,2
+	byte 159,100,104,14
+
+**********************************
+* Extended BASIC Porting support *
+* by Tursi                       *
+**********************************
+
+************************************
+* VDP support for the XB functions *
+************************************
+
+* non-bitmap mode, ext video off
+* 16k, screen on, ints on, magnify 1 (differs from XB)
+* SDT at >0000
+* different from XB - CT at >1000
+* different from XB - PDT at >0800
+* SAT at >0300 (motion table at >0780, fixed)
+* different from XB - SPT at >0800
+* transparent on XB color 15
+VDPTAB  DATA >00E1,>0040,>0106,>010E
+
+* write address - R12 has word ready to write with tags
+WRADR	SWPB R12
+		MOVB R12,@>8C02
+		SWPB R12
+		MOVB R12,@>8C02
+		B *R11
+		
+* write byte in R12 MSB R13 times to VDP
+VDPSET	MOVB R12,@>8C00
+		DEC R13
+		JNE VDPSET
+		B *R11
+
+* XB-LIKE FUNCTIONS - REGS 0+ FOR INPUTS, BL TO CALL
+* MUST PRESERVE REGS, BUT CAN USE R10,R12-R14
+
+CLEAR	LI R12,>4000
+		MOV R11,R14
+		bl *r5
+		LI R12,>2000
+		LI R13,768
+		BL @VDPSET
+		B *R14
+		
+* DISPADR - Set the write VDP address for a display function
+* 1=ROW+1,2=COL-1 (28 col print)
+DISPADR		
+		MOV R1,R12
+		DEC R12
+		SLA R12,5
+		A R2,R12
+		INC R12
+		ORI R12,>4000
+		B @WRADR		* just branch, so it returns for us
+		
+*DISPLAY	0=STRING (+ TERMINATED),1=ROW+1,2=COL-1 (28 col print)
+DISPLAY	MOV R11,R14
+		BL @DISPADR
+		MOV R0,R12
+		CLR R13
+DSLP1	MOVB *R12+,R13
+		CI R13,>2B00
+		JEQ DSEXIT
+		MOVB R13,@>8C00
+		JMP DSLP1
+DSEXIT	B *R14
+
+*DISNUM	0=NUMBER TO PRINT,1=ROW+1,2=COL-1 (28 col print)
+DISNUM	MOV R11,R14
+		BL @DISPADR
+		CLR R10			* Use as flag
+		MOV R0,R13
+		CLR R12			* prepare for DIV
+		LI R11,10000	* we can use R11 now ;)
+		DIV R11,R12		* R12=result, R13=remainder
+		MOV R12,R12
+		JEQ SKIP01
+		AI R12,48
+		SWPB R12
+		MOVB R12,@>8C00
+		SETO R10		* don't need to test on the first digit
+SKIP01	LI R11,1000
+		CLR R12
+		DIV R11,R12
+		MOV R12,R12
+		JNE NSKP1
+		MOV R10,R10
+		JEQ SKIP02
+NSKP1	AI R12,48
+		SWPB R12
+		MOVB R12,@>8C00
+		SETO R10
+SKIP02	LI R11,100
+		CLR R12
+		DIV R11,R12
+		MOV R12,R12
+		JNE NSKP2
+		MOV R10,R10
+		JEQ SKIP03
+NSKP2	AI R12,48
+		SWPB R12
+		MOVB R12,@>8C00
+		SETO R10
+SKIP03	LI R11,10
+		CLR R12
+		DIV R11,R12
+		MOV R12,R12
+		JNE NSKP3
+		MOV R10,R10
+		JEQ SKIP04
+NSKP3	AI R12,48
+		SWPB R12
+		MOVB R12,@>8C00
+		SETO R10
+SKIP04	AI R13,48		* always print the last digit
+		SWPB R13
+		MOVB R13,@>8C00
+		B *R14
+		
+*CHAR	R0=CHAR,R1=ADDRESS OF BYTES, R2=NUMBER OF BYTES
+CHAR	MOV R11,R14
+		MOV R0,R12
+		SLA R12,3
+		AI R12,>4800
+CHAR1	bl *r5
+		MOV R1,R12
+		MOV R2,R13
+		MOV R14,R11		* make the below reusable
+* VDP Copy - source in R12, count in R13, VDP already set
+VDPCPY	MOVB *R12+,@>8C00
+		DEC R13
+		JNE VDPCPY
+		B *R11
+		
+* HCHARADR (also for vchar, gchar, etc)
+* R0,R1 to R12 for read
+HCHARADR
+		MOV R0,R12
+		DEC R12
+		SLA R12,5
+		A R1,R12
+		DEC R12
+		B *R11
+		
+* HCHARF - fixed value hchar
+* the four values, as bytes, are at the return address
+* we have a lot of hchars... count==0 is illegal
+* continues till it finds a 0 byte for row, skips the next
+* byte too for an even return address.
+HCHARF
+		mov r11,r10
+		clr r0
+		clr r1
+		clr r2
+		clr r3
+		movb *r10+,@>8301
+HCHARF2
+		movb *r10+,@>8303
+		movb *r10+,@>8305
+		movb *r10+,@>8307
+		bl @hchar
+		movb *r10+,@>8301
+		jne HCHARF2
+		inc r10
+		b *r10
+	
+*HCHAR1 0,1,2 - single character hchar wrapper
+HCHAR1	MOV R8,R3	* LOADS 1 - LI R3,1
+* fall through into hchar
+
+*HCHAR	0,1,2,3 (ALL EXCEPT 2 and 3 ARE +1)
+HCHAR	MOV R11,R14
+		BL @HCHARADR
+		ORI R12,>4000
+		bl *r5
+		MOV R2,R12
+		SWPB R12
+		MOV R3,R13
+		JEQ HCHAROUT
+		BL @VDPSET
+HCHAROUT		
+		B *R14
+
+*GCHAR	0=ROW,1=COL, RETURN IN 2
+GCHAR	MOV R11,R14
+		bl @hcharadr
+		bl *r5
+		CLR R2
+		MOVB @>8800,R2
+		SWPB R2
+		B *R14
+		
+* scan - wrapped call to KSCAN
+* after this, KEY and JOYST just read the return variables
+SCAN
+		mov r11,r14
+		movb @>8311,@>8374	* R8 LSB - mode 1 - scans keyboard and joystick
+		lwpi >83e0		* GPLWS
+		bl @>000e		* scan
+		lwpi >8300
+		b *r14
+		
+*KEY  Scan must be called first - RETURN 1=K
+KEY	
+		clr r1
+		movb @>8375,r1
+		swpb r1
+		b *r11
+		
+* DSPRALL	DELETES ALL SPRITES
+DSPRALL	MOV R11,R14
+		LI R12,>4300
+		bl *r5
+		LI R12,>E100
+		LI R13,128
+		BL @VDPSET
+* and the automotion table
+		LI R12,>4780
+		bl *r5
+		CLR R12
+		LI R13,128
+		BL @VDPSET
+		B *R14
+
+* VCHARF - fixed value vchar
+* the four values, as bytes, are at the return address
+* we have a lot of hchars...
+VCHARF
+		mov r11,r10
+		clr r0
+		clr r1
+		clr r2
+		clr r3
+		movb *r10+,@>8301
+VCHARF2		
+		movb *r10+,@>8303
+		movb *r10+,@>8305
+		movb *r10+,@>8307
+		
+* inline vchar
+		bl @hcharadr
+		MOV R3,R13
+		JEQ VCHAROUT
+		ORI R12,>4000
+		SWPB R2
+VCHAR1	bl *r5
+		MOVB R2,@>8C00
+		AI R12,32
+		DEC R13
+		JNE VCHAR1
+*		SWPB R2				* this one doesn't need to preserve r2
+VCHAROUT		
+
+		movb *r10+,@>8301
+		jne VCHARF2
+		inc r10
+		b *R10
+
+* get sprite vdp address from sprite r0 to r12
+SPRITEADR
+		MOV R0,R12
+		DEC R12
+		SLA R12,2
+		AI R12,>0300
+		B *R11
+		
+* SPRITE 0=SPRITE+1, 1=CHARACTER, 2=COLOR+1, 3=ROW+2, 4=COL+1
+SPRITE	MOV R11,R14
+		bl @SPRITEADR
+		ORI R12,>4000
+		bl *r5
+		MOV R3,R12
+		DECT R12
+		SWPB R12
+		MOVB R12,@>8C00
+		MOV R4,R12
+		DEC R12
+		SWPB R12
+		MOVB R12,@>8C00
+		MOV R1,R12
+		SWPB R12
+		MOVB R12,@>8C00
+		MOV R2,R12
+		DEC R12
+		ANDI R12,>000F
+		SWPB R12
+		MOVB R12,@>8C00
+		B *R14
+
+* LOCATE 0=SPRITE+1, 1=ROW+2, 2=COL+1
+LOCATE	MOV R11,R14
+		bl @spriteadr
+		ORI R12,>4000
+		bl *r5
+		MOV R1,R12
+		DECT R12			* TOP LINE IS -1, NOT 1
+		SWPB R12
+		MOVB R12,@>8C00
+		MOV R2,R12
+		DEC R12				* LEFT COL IS 0, NOT 1
+		SWPB R12
+		MOVB R12,@>8C00
+		B *R14
+
+* POSITION 0=SPRITE+1, RETURN: 1=ROW+2, 2=COL+1
+POSITION	
+		MOV R11,R14
+		bl @spriteadr
+		bl *r5
+		CLR R1
+		CLR R2
+		MOVB @>8800,R1
+		SWPB R1
+		MOVB @>8800,R2
+		SWPB R2
+		INCT R1       * fix top line offset (-1 to 1)
+		ANDI R1,>00FF * mask it, it's supposed to wrap around
+		INC R2        * fix left column (0 to 1) (256 is okay)
+		B *R14
+
+* SOUND  0 - DURATION (INCL. NEGATIVE), 1 - PITCH (INCL. NEGATIVE), 2 - VOLUME
+* note: only one voice at a time, and tone or noise only
+* Note2: Duration calculation was wrong in TI MOTIF
+SOUND	LI R12,>8000
+		MOV R0,R13
+		COC R12,R13			* NEGATIVE?
+		JNE SOUND1			* IF NO, GO WAIT
+		NEG R13				* MAKE POSITIVE
+		JMP SOUND3			* AND GO PLAY IT
+SOUND1	MOV @SNDDEL,R12
+		JEQ SOUND3
+		seto @>83d6
+		mov r11,r10			* save return for delay
+SOUND2
+		bl *r6			* delay, sprites, etc
+		mov @SNDDEL,r0		* check if done
+		JNE SOUND2
+		mov r10,r11			* restore return address
+SOUND3	CLR R12
+		LI R14,16			* 16ms/frame, not 60!
+		DIV R14,R12
+		MOV R12,@SNDDEL		* SAVE DURATION IN FRAMES
+		MOV R1,R14
+		JLT SOUND4			* NEGATIVE, PLAY NOISE
+		LI R12,>0001		* POSITIVE, PLAY TONE
+		LI R13,>B4F5		* 111861
+		DIV R14,R12
+		MOV R12,R13
+		ANDI R12,>000F
+		ORI R12,>0080
+		SWPB R12
+		MOVB R12,@>8400
+		SRL R13,4
+		SWPB R13
+		MOVB R13,@>8400
+		MOV R2,R12
+		ANDI R12,31
+		SRA R12,1
+		ORI R12,>0090
+		SWPB R12
+		MOVB R12,@>8400
+		LI R12,>FF00
+		MOVB R12,@>8400
+		JMP SOUND5
+SOUND4	INV R14
+		ANDI R14,>000F
+		ORI R14,>00E0
+		SWPB R14
+		MOVB R14,@>8400		* PLAY NOISE
+		MOV R2,R12
+		ANDI R12,31
+		SRA R12,1
+		ORI R12,>00F0
+		SWPB R12
+		MOVB R12,@>8400
+		LI R12,>9F00
+		MOVB R12,@>8400
+SOUND5	B *R11		
+
+* PATTERN 0 = SPRITE+1, 1=CHARACTER CODE
+PATTERN	MOV R11,R14
+		MOV R0,R12
+		DEC R12
+		SLA R12,2
+		AI R12,>0302
+		ORI R12,>4000
+		bl *r5
+		SWPB R1
+		MOVB R1,@>8C00
+		SWPB R1
+		B *R14
+		
+* COINC - (only ALL) return non-zero in r0 if set - uses cached copy, ints must run!
+COINC 
+* we do the frame interrupt inline here - this is called every game frame!
+* we use R0 for scratch because we return r0 anyway
+		clr @>83d6
+INTWAIT		
+		limi 2
+		limi 0
+		mov @>83d6,r0
+		ci r0,12		* int increments by two when it runs, so this is our throttle
+		jl intwait		* should be ~4fps right now (game only - sprites run 60hz)
+		
+* handle sound timeout
+		mov @snddel,r0
+		jeq intw2
+		
+		ai r0,-6			* number of frames above
+		mov r0,@snddel
+		jgt intw2
+		clr @snddel
+        LI R0,>9FFF		* mute all sound (we only use 2 channels)
+		MOVB R0,@>8400
+		SWPB R0
+		MOVB R0,@>8400
+intw2
+
+* this is the actual coinc now
+		CLR r0
+		movb @>837b,r0
+* todo: dynamic cheat?		
+*		andi r0,>2000
+* THIS LINE IS CHEATING
+		andi r0,>0000
+		B *R11
+
+* CDELAY - r0 number of times to call COINC
+CDELAY
+		mov r11,r14
+		mov r0,r12
+CDELAY1
+		bl *r6
+		dec r12
+		jne cdelay1
+		b *R14
+
+* MOTION 0=sprite+1, 1=row speed, 2=column speed
+MOTION
+		MOV R11,R14
+		bl @spriteadr
+		AI R12,>4480
+		bl *r5
+		swpb r1
+		movb r1,@>8c00
+		swpb r1
+		swpb r2
+		movb r2,@>8c00
+		swpb r2
+		clr r12
+		movb r12,@>8c00
+		movb r12,@>8c00
+		B *R14
+
+*delspr - r0 = sprite+1
+DELSPR
+		MOV R11,R14
+		MOV R0,R12
+		DEC R12
+		SLA R12,2
+		AI R12,>4300
+		bl *r5
+		li r13,>E100			* sprite automotion doesn't allow values from c1-e0
+		movb r13,@>8c00
+		ai r12,>0480
+		bl *r5
+		clr r13
+		movb r13,@>8c00
+		movb r13,@>8c00
+		movb r13,@>8c00
+		movb r13,@>8c00
+		b *r14
+
+waitnewkey
+		mov r11,r10
+waitA		
+		bl @scan
+		bl @key
+		ci r1,18
+		jeq waitA
+waitB	
+		bl *r6		* delays and sound processing!
+		bl @scan
+		bl @key
+		ci r1,18
+		jne waitB
+		
+		B *r10
+
+* converts sprite pixel coordinates to chars
+* RO returns in r0, CO returns in r1 (each /8+1)		
+pix2char
+		mov @ro,r0
+		srl r0,3
+		inc r0
+		mov @co,r1
+		srl r1,3
+		inc r1
+		B *r11
+		
+		END
+
