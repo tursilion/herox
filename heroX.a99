@@ -88,7 +88,6 @@
 LE	bss 2	* level
 NM	bss 2	* number men
 SC	bss 2	* score
-AS	bss 2	* animation state
 NW	bss 2	* number wafers left
 A	bss 2	* index loop
 B	bss 2	* index loop
@@ -167,7 +166,7 @@ GOGAME
 		LWPI >8300			* set correct workspace
 		LI R8,1				* we reserve R8 to always be the value '1' to save some memory
 		li r4,>8C00			* VDPWD
-		LI R5,wradr			* R5 for wradr
+		LI R5,wradr1		* R5 for wradr
 		LI R6,coinc			* r6 for coinc
 		LI R7,pattern		* r7 for pattern
 		li r9,motion		* r9 for motion
@@ -179,7 +178,7 @@ GOGAME
 		LI R10,8
 INITL1
 		MOVB *R13+,@>8319	* R12 LSB
-		bl *r5
+		bl @wradrf
 		AI R12,>0100
 		DEC R10
 		JNE INITL1
@@ -189,18 +188,18 @@ INITL1
 
 * we won't call CLEAR, user can do that, but we do
 * need to wipe the sprite table
-		LI R12,>4300
 		bl *r5
+		data >4300
 		BL @VDPSETF
 		BYTE >D0,128
 * and the automotion table
-		LI R12,>4780
 		bl *r5
+		data >4780
 		BL @VDPSETF
 		BYTE 0,128
 * and set the color table to all black on trans
-		LI R12,>5000
 		bl *r5
+		data >5000
 		BL @VDPSETF
 		byte >10,32
 * AND CLEAR ANY SOUND DELAY COUNTER
@@ -214,8 +213,8 @@ INITL1
 *10 CALL INIT		- not the XB init, my own sub!
 * inline init	
 *10005 CALL COLOR(10,7,1,11,14,1,12,2,1,13,11,1)
-	li r12,>500D
 	bl *r5
+	data >500d
 	li r12,CDAT
 	li r13,4
 	bl @vdpcpy
@@ -292,7 +291,7 @@ l100
 l150
 *	BL @DSPRALL  * done in clear
 
-*155 AS=0
+*155 AS=0 * no longer used - bl @animframe instead
 
 *157 NW=4
 	li r0,4
@@ -330,8 +329,8 @@ l190
 
 *200 CALL COLOR(#1,2)
 * Inline SPcolor
-	LI R12,>4303      * address of sprite 1 color for write
 	bl *r5
+	data >4303
 	MOVB @>8311,R12    * R8 LSB to R12 MSB for color 1
 	MOVB R12,*r4
 
@@ -478,7 +477,7 @@ l214
 	mov r2,@co
 	bl @snaprow		* this will call locate
 
-*225 AS=AS=0
+*225 AS=AS=0 * no longer used
 l225
 
 *228 CALL PATTERN(#1,96-2*(X=-4)-AS)
@@ -832,7 +831,7 @@ l4020b
 	
 	li r1,98
 	bl @animframe
-	a r0,r1			* screw AN, I'm using AS
+	a r0,r1			* screw AN, I'm using AS (now in animframe)
 	mov r8,r0
 	bl *r7
 	
@@ -1406,14 +1405,14 @@ JTAB2 data l10720,l10800,l10900,l11000,l12000
 *10760 SUBEXIT
 
 l10720
-	li r12,>430c
 	bl *r5
+	data >430c
 	li r12,SDAT1
 	li r13,48
 	bl @vdpcpy
 	
-	LI R12,>478C
 	bl *r5
+	data >478c
 	BL @VDPSETF
 	byte 0,128
 	
@@ -1424,7 +1423,7 @@ l10720
 
 * write 4 sets of three, inverting 5/-5 each time
 l10720b
-	bl *r5
+	bl @wradrf
 	ai r12,4
 	movb r13,*r4
 	dec r14
@@ -1452,13 +1451,13 @@ SDAT1
 
 l10800
 	li r12,>430c
-	bl *r5
+	bl @wradrf
 	li r12,SDAT2
 	li r13,32
 	bl @vdpcpy
 	
-	LI R12,>478C
 	bl *r5
+	data >478c
 	BL @VDPSETF
 	byte 0,128
 	
@@ -1469,7 +1468,7 @@ l10800
 
 * write 4 sets of two, inverting 5/-5 each time
 l10800b
-	bl *r5
+	bl @wradrf
 	ai r12,4
 	movb r13,*r4
 	dec r14
@@ -1495,14 +1494,14 @@ SDAT2
 *10940 SUBEXIT
 
 l10900
-	li r12,>430c
 	bl *r5
+	data >430c
 	li r12,SDAT3
 	li r13,40
 	bl @vdpcpy
 	
-	LI R12,>478C
 	bl *r5
+	data >478c
 	BL @VDPSETF
 	byte 0,128
 	
@@ -1513,7 +1512,7 @@ l10900
 
 * write 4 sets of three, inverting 5/-5 each time
 l10900b
-	bl *r5				* note: only 1 sprite in the last set, hopefully won't break ;)
+	bl @wradrf				* note: only 1 sprite in the last set, hopefully won't break ;)
 	ai r12,4
 	movb r13,*r4
 	dec r14
@@ -1539,14 +1538,14 @@ SDAT3
 *11040 SUBEXIT
 
 l11000
-	li r12,>430c
 	bl *r5
+	data >430c
 	li r12,SDAT4
 	li r13,28
 	bl @vdpcpy
 	
-	LI R12,>478C
 	bl *r5
+	data >478c
 	BL @VDPSETF
 	byte 0,128
 	
@@ -1582,14 +1581,14 @@ SDAT4
 *12080 SUBEND
 
 l12000
-	li r12,>4304
 	bl *r5
+	data >4304
 	li r12,SDAT5
 	li r13,36
 	bl @vdpcpy
 	
-	LI R12,>4784
 	bl *r5
+	data >4784
 	BL @VDPSETF
 	byte 0,128
 
@@ -1638,8 +1637,13 @@ SDAT5
 * transparent on XB color 15
 VDPTAB  DATA >00E1,>0840,>0106,>010E
 
+* Write address - address is data after the fact
+WRADR1
+    MOV *r11+,r12
+    
 * write address - R12 has word ready to write with tags
-WRADR	SWPB R12
+WRADRF
+    SWPB R12
 		MOVB R12,@>8C02
 		SWPB R12
 		MOVB R12,@>8C02
@@ -1662,8 +1666,8 @@ VDPSET	MOVB R12,*r4
 
 CLEAR	mov r11,r10
 		bl @dsprall
-		LI R12,>6000
 		bl *r5
+		data >6000
 		LI R12,>2000
 		LI R13,>500   * 512 bytes padding for jump wraparound
 		BL @VDPSET
@@ -1681,7 +1685,7 @@ DISPADR
 		ab *r14+,@>8319		* I think this should always be safe, no wrap
 		INC R12
 		ORI R12,>6000
-		B @WRADR		* just branch, so it returns for us
+		B @WRADRF		* just branch, so it returns for us
 		
 *DISPLAY	0=STRING (>80 TERMINATED),1=ROW+1,2=COL-1 (28 col print)
 * data: row,col,address
@@ -1696,8 +1700,8 @@ DSEXIT	B *R14
 
 *DISNUM	@SC, at 24,1 (XB offsets) (28 col print)
 DISNUM	MOV R11,R14
-		LI R12,>62e2	* (24,3)
-		BL @WRADR
+		BL *r5
+		data >62e2    * 24,3
 		MOV @SC,R13		* dividend
 		LI R11,10000	* divisor
 DNUMLP	
@@ -1721,7 +1725,7 @@ CHAR	MOV R11,R14
 		movb *r14+,@>8319	* r12 LSB
 		SLA R12,3
 		AI R12,>4800
-CHAR1	bl *r5
+CHAR1	bl @wradrf
 		clr r13
 		movb *r14+,@>831b	* r13 LSB
 		mov *r14+,r12
@@ -1734,6 +1738,7 @@ VDPCPY	MOVB *R12+,*r4
 		
 * HCHARADR (also for vchar, gchar, etc)
 * R0,R1 to R12 for read
+* pass in a value to add (0 for read, >4000 for write)
 HCHARADR
 		MOV R0,R12
 		DEC R12
@@ -1742,6 +1747,7 @@ HCHARADR
 		A R1,R12
 		DEC R12
 		AI R12,>2000
+		A *R11+,R12
 		B *R11
 		
 * HCHARF - fixed value hchar
@@ -1773,8 +1779,8 @@ HCHAR1	MOV R8,R3	* LOADS 1 - LI R3,1
 *HCHAR	0,1,2,3 (ALL EXCEPT 2 and 3 ARE +1)
 HCHAR	MOV R11,R14
 		BL @HCHARADR
-		ORI R12,>4000
-		bl *r5
+		DATA >4000
+		bl @wradrf
 		MOV R2,R12
 		SWPB R12
 		MOV R3,R13
@@ -1786,7 +1792,8 @@ HCHAROUT
 *GCHAR	0=ROW,1=COL, RETURN IN 2
 GCHAR	MOV R11,R14
 		bl @hcharadr
-		bl *r5
+		DATA >0000
+		bl @wradrf
 		CLR R2
 		MOVB @>8800,R2
 		SWPB R2
@@ -1811,13 +1818,13 @@ KEY
 		
 * DSPRALL	DELETES ALL SPRITES
 DSPRALL	MOV R11,R14
-		LI R12,>4300
 		bl *r5
+		data >4300
 		BL @VDPSETF
 		byte >e1,128
 * and the automotion table
-		LI R12,>4780
 		bl *r5
+		data >4780
 		BL @VDPSETF
 		BYTE 0,128
 		B *R14
@@ -1839,11 +1846,11 @@ VCHARF2
 		
 * inline vchar
 		bl @hcharadr
+		DATA >4000
 		MOV R3,R13
 		JEQ VCHAROUT
-		ORI R12,>4000
 		SWPB R2
-VCHAR1	bl *r5
+VCHAR1	bl @wradrf
 		MOVB R2,*r4
 		AI R12,32
 		DEC R13
@@ -1861,7 +1868,7 @@ SPRITEADR
 		MOV R0,R12
 		DEC R12
 		SLA R12,2
-		AI R12,>0300
+		AI R12,>4300
 		B *R11
 		
 * SPRITE 0=SPRITE+1, 1=ROW+2, 2=COL+1, 3=CHARACTER, 4=COLOR
@@ -1870,8 +1877,7 @@ SPRITE	MOV R11,R14
 		clr r0
 		movb *r14+,@>8301   * R1 LSB
 		bl @SPRITEADR
-		ORI R12,>4000
-		bl *r5
+		bl @wradrf
 		movb *r14+,r12
 		ai r12,->0200
 		MOVB R12,*r4
@@ -1886,8 +1892,7 @@ SPRITE	MOV R11,R14
 * LOCATE 0=SPRITE+1, 1=ROW+2, 2=COL+1
 LOCATE	MOV R11,R14
 		bl @spriteadr
-		ORI R12,>4000
-		bl *r5
+		bl @wradrf
 		MOV R1,R12
 		DECT R12			* TOP LINE IS -1, NOT 1
 		SWPB R12
@@ -1904,7 +1909,8 @@ LOCATE	MOV R11,R14
 POSITION
 		MOV R11,R14
 		bl @spriteadr
-		bl *r5
+		andi r12,>3fff    * want a read address
+		bl @wradrf
 		CLR R1
 		CLR R2
 		MOVB @>8800,R1
@@ -1997,7 +2003,7 @@ PATTERN	MOV R11,R14
 		SLA R12,2
 		AI R12,>0302
 		ORI R12,>4000
-		bl *r5
+		bl @wradrf
 		SWPB R1
 		MOVB R1,*r4
 		SWPB R1
@@ -2049,8 +2055,8 @@ CDELAY1
 MOTION
 		MOV R11,R14
 		bl @spriteadr
-		AI R12,>4480
-		bl *r5
+		AI R12,>0480   * need motion table
+		bl @wradrf
 		swpb r1
 		movb r1,*r4
 		swpb r1
@@ -2069,11 +2075,11 @@ DELSPR
 		DEC R12
 		SLA R12,2
 		AI R12,>4300
-		bl *r5
+		bl @wradrf
 		li r13,>E100			* sprite automotion doesn't allow values from c1-e0
 		movb r13,*r4
 		ai r12,>0480
-		bl *r5
+		bl @wradrf
 		clr r13
 		movb r13,*r4
 		movb r13,*r4
