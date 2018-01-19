@@ -1,5 +1,5 @@
 ** The whole end sequence is messed up by the new speed
-** but otherwise it works. Currentl exactly 4k (including header)
+** but otherwise it works.
 
 ************************
 * HeroX - by Tursi     *
@@ -91,7 +91,6 @@ SC	bss 2	* score
 NW	bss 2	* number wafers left
 A	bss 2	* index loop
 B	bss 2	* index loop
-qw	bss 2	* temporary
 ro	bss 2	* row (usually player, but sprite is authoritative)
 co  bss 2	* column (same)
 rs  bss 2	* row speed (used for jumping)
@@ -162,9 +161,9 @@ CHARDAT3
 		data >7E42,>4242,>7E42,>4242
 	
 GOGAME	
-		LIMI 0				* disable interrupts
+		LIMI 0				  * disable interrupts
 		LWPI >8300			* set correct workspace
-		LI R8,1				* we reserve R8 to always be the value '1' to save some memory
+		LI R8,1				  * we reserve R8 to always be the value '1' to save some memory
 		li r4,>8C00			* VDPWD
 		LI R5,wradr1		* R5 for wradr
 		LI R6,coinc			* r6 for coinc
@@ -173,51 +172,42 @@ GOGAME
 
 * inline initvdp
 * Set GR0 mode similar to XB
-		LI R12,>8000
+		LI R12,>8000    * reg 0 gets >00, so this is correct
 		LI R13,VDPTAB
-		LI R10,8
 INITL1
-		MOVB *R13+,@>8319	* R12 LSB
 		bl @wradrf
 		AI R12,>0100
-		DEC R10
+		MOVB *R13+,@>8319	* R12 LSB - that allows us to check for 00 here
 		JNE INITL1
 		
-		LI R12,>E100	* 16k, screen on, ints on, magnify 1 (differs from XB)
-		MOVB R12,@>83d4 * also put VDP R1 at the KSCAN reload
+		LI R12,>E11F	* 16k, screen on, ints on, magnify 1 (differs from XB) & automotion limit
+		MOVB R12,@>83d4 * put VDP R1 at the KSCAN reload
+		SWPB R12
+		MOVB R0,@>837A	* automotion limit
 
 * we won't call CLEAR, user can do that, but we do
 * need to wipe the sprite table
-		bl *r5
-		data >4300
 		BL @VDPSETF
+		data >4300
 		BYTE >D0,128
 * and the automotion table
-		bl *r5
-		data >4780
 		BL @VDPSETF
+		data >4780
 		BYTE 0,128
 * and set the color table to all black on trans
-		bl *r5
-		data >5000
 		BL @VDPSETF
+		data >5000
 		byte >10,32
 * AND CLEAR ANY SOUND DELAY COUNTER
 		CLR @SNDDEL
-
-		LI R0,>1F00
-		MOVB R0,@>837A	* automotion limit
 
 *1 CALL SCREEN(15)		* in the VDP init
 
 *10 CALL INIT		- not the XB init, my own sub!
 * inline init	
 *10005 CALL COLOR(10,7,1,11,14,1,12,2,1,13,11,1)
-	bl *r5
-	data >500d
-	li r12,CDAT
-	li r13,4
 	bl @vdpcpy
+	data >500d,CDAT,4
 	
 *10010 RESTORE		* oh, goodie... data
 *10020 FOR A=96 TO 114
@@ -331,8 +321,7 @@ l190
 * Inline SPcolor
 	bl *r5
 	data >4303
-	MOVB @>8311,R12    * R8 LSB to R12 MSB for color 1
-	MOVB R12,*r4
+	MOVB @>8311,*r4    * R8 LSB for color 1
 
 *210 CALL JOYST(C,X,Y)
 l210
@@ -343,7 +332,7 @@ l210
 * handle ongoing jump (or fall)
 	inc @rs
 	mov @rs,r3
-	ci r3,24        * max fall speed
+	ci r3,24    * max fall speed
 	jlt jump2
 	b @l2000		* die if fall too far
 jump2
@@ -360,13 +349,13 @@ jump3
 	a r3,r1			* add to position
 	ci r1,187
 	jlt jump4
-	ci r1,220       * don't die for wraparound
-	jgt jump4       
+	ci r1,220   * don't die for wraparound
+	jgt jump4   
 	b @l2000		* die if fall off bottom
 jump4
 	mov r1,@ro
 	mov r2,@co
-	bl @locate		* move sprite into place
+	bl @locate	* move sprite into place
 
 	mov @rs,r0
 	jlt jump5		* skip if moving up
@@ -378,7 +367,7 @@ jump4
 	ci r2,112
 	jeq jump5
 	clr @ij			* landed
-	bl @snaprow		* snap row
+	bl @snaprow	* snap row
 jump5
 	bl *r6			* coinc
 	mov r0,r0
@@ -391,7 +380,6 @@ jump6
 l210b
 	bl @scan
 * inline joyst
-	clr r1
 	movb @>8377,r1
 	sra r1,10       * sign extend, /2!
 	mov r1,@cs
@@ -418,9 +406,7 @@ l210b
 *250 CALL POSITION(#1,RO,CO)
 l250
 	mov r8,r0
-	bl @position
-	mov r1,@ro
-	mov r2,@co
+	bl @positionraw
 
 *260 CALL GCHAR(RO/8+1-2*(Y=-4),CO/8+1,QW)
 	bl @pix2char
@@ -453,7 +439,7 @@ l260b
 	mov r1,@ro
 	bl @snapcol		* this will call locate
 	
-	jmp l300		* don't allow x movement
+	jmp l300		  * don't allow x movement
 
 *214 if X=0 then 300
 l214
@@ -462,9 +448,7 @@ l214
 
 *217 CALL POSITION(#1,RO,CO)
 	mov r8,r0
-	bl @position
-	mov r1,@ro
-	mov r2,@co
+	bl @positionraw
 
 *220 CO=CO+X*2 :: if CO<1 or CO>255 then 225
 	mov @cs,r3
@@ -483,8 +467,8 @@ l225
 *228 CALL PATTERN(#1,96-2*(X=-4)-AS)
 	li r1,96
 *	mov @x,r0	* @X is still in r3
-    mov r3,r3
-    jlt l228c
+  mov r3,r3
+  jlt l228c
 	jne l228b
 l228c
 	inct r1
@@ -497,7 +481,7 @@ l228b
 *300 CALL KEY(C,K,S) :: IF K<>18 THEN 400
 l300
 	bl @key      * scan was already done above
-	ci r1,18
+*	ci r1,18     * done in key
 	jeq l300b
 	b @l400
 l300b
@@ -509,9 +493,8 @@ l300b
 	mov r0,@rs
 	
 *330 CALL SOUND(100,-3,15)
-	li r1,-3
-	li r2,7
 	bl @soundvol
+	byte -3,7
 
 * check for wafer (thus +2, not +3)
 *400 CALL POSITION(#1,RO,CO) :: RO=RO/8+2 :: CO=CO/8+1
@@ -519,17 +502,13 @@ l300b
 *410 CALL GCHAR(RO,CO,QW) :: IF QW=112 THEN CALL HCHAR(RO,CO,32) :: CALL SOUND(100,550,0) :: NW=NW-1 :: SC=SC+50 :: DISPLAY AT(24,1):SC
 l400
 	mov r8,r0
-	bl @position
-	mov r1,@ro
-	mov r2,@co
+	bl @positionraw
 	bl @pix2char
 	inc r0
 	mov r0,@ro
 	mov r1,@co
 
 	bl @gchar
-	mov r2,@qw
-	
 	ci r2,112
 	jne l410b
 	
@@ -538,8 +517,8 @@ l400
 	li r2,32
 	bl @hchar1
 	
-	li r1,550		* make tone
 	bl @sound100
+	data 550
 	
 	dec @nw			* count collected wafers
 	
@@ -557,38 +536,24 @@ l410b
 * Check if ladder (fixed location) needs to be drawn
 * any object there prevents it!
 *421 CALL GCHAR(1,5,QW) :: IF QW<>32 THEN 440
-	mov r8,r0
-	li r1,5
-	bl @gchar
-	ci r2,32
-	jne l440
+* not doing for ROM space, the vchar is fast enough
+*	mov r8,r0
+*	li r1,5
+*	bl @gchar
+*	ci r2,32
+*	jne l440
 
-* set up loop to draw ladder as far as necessary
 *425 RO=1 :: CO=5
-	mov r8,@ro
-	li r0,5
-	mov r0,@co
-
-* the actual loop is here - draw till we hit something (anything)
 *430 CALL GCHAR(RO,CO,QW) :: IF QW=32 THEN CALL HCHAR(RO,CO,128) :: RO=RO+1 :: GOTO 430
-l430
-	mov @ro,r0
-	mov @co,r1
-	bl @gchar
-	ci r2,32
-	jne l430b
-	
-	li r2,128
-	bl @hchar1
-	
-	inc @ro
-	jmp l430
-l430b	
-
+* unneeded, we'll just do a blind vchar
+  bl @vcharf
+  byte 1,5,128,4
+  byte 0,0
+  
 * main game loops around here
 *435 GOTO 210
-l435
-	b @l210
+*l435
+*	b @l210
 
 * if no ladder draw, then we come here
 * if row (character) is less than 3, then we must have climbed to the top - do win routine
@@ -760,9 +725,9 @@ l3020b
 	bl *r6			* slow it down a bit, this is just a timeout delay
 	bl @scan
 	bl @key
+*	ci r1,18    * done in key
 	
 *3030 IF K=18 THEN 20
-	ci r1,18
 	jne l3040
 	b @l20
 	
@@ -856,9 +821,8 @@ l4020c
 	li r1,113
 	bl *r7
 	
-	li r1,-6
-	li r2,5
 	bl @soundvol
+	byte -6,5
 	bl *r6			* delay
 
 * drop villian
@@ -897,9 +861,7 @@ l4070
 * move up to machine	
 *4090 CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO-8)
 	mov r8,r0
-	bl @position
-	mov r1,@ro
-	mov r2,@co
+	bl @positionraw
 	ai r2,-8
 	bl @locate
 	bl *r6
@@ -946,9 +908,8 @@ l4070
 	bl *r7
 	
 *4160 CALL SOUND(100,-6,4)
-	li r1,-6
-	li r2,2
 	bl @soundvol
+	byte -6,2
 	bl *r6
 	
 * break machine and unpunch	
@@ -1127,8 +1088,8 @@ l4390b
 	c r0,@nm
 	jh l4400b
 	
-	li r1,1000
 	bl @sound100
+	data 1000
 	
 	li r0,9
 	mov @co,r1
@@ -1168,7 +1129,7 @@ l4410b
 	bl *r6			* slow it down a bit, this is just a timeout delay
 	bl @scan
 	bl @key
-	ci r1,18
+*	ci r1,18    * done in key
 	jne l4420
 	b @l20
 
@@ -1405,15 +1366,11 @@ JTAB2 data l10720,l10800,l10900,l11000,l12000
 *10760 SUBEXIT
 
 l10720
-	bl *r5
-	data >430c
-	li r12,SDAT1
-	li r13,48
 	bl @vdpcpy
+	data >430c,SDAT1,48
 	
-	bl *r5
-	data >478c
 	BL @VDPSETF
+	data >478c
 	byte 0,128
 	
 	LI R12,>478D
@@ -1450,15 +1407,11 @@ SDAT1
 *10840 SUBEXIT
 
 l10800
-	li r12,>430c
-	bl @wradrf
-	li r12,SDAT2
-	li r13,32
 	bl @vdpcpy
+	data >430c,SDAT2,32
 	
-	bl *r5
-	data >478c
 	BL @VDPSETF
+	data >478c
 	byte 0,128
 	
 	LI R12,>478D
@@ -1494,15 +1447,11 @@ SDAT2
 *10940 SUBEXIT
 
 l10900
-	bl *r5
-	data >430c
-	li r12,SDAT3
-	li r13,40
 	bl @vdpcpy
+	DATA >430c,SDAT3,40
 	
-	bl *r5
-	data >478c
 	BL @VDPSETF
+	data >478c
 	byte 0,128
 	
 	LI R12,>478D
@@ -1538,15 +1487,11 @@ SDAT3
 *11040 SUBEXIT
 
 l11000
-	bl *r5
-	data >430c
-	li r12,SDAT4
-	li r13,28
 	bl @vdpcpy
+	DATA >430C,SDAT4,28
 	
-	bl *r5
-	data >478c
 	BL @VDPSETF
+	data >478c
 	byte 0,128
 	
 	li r0,6
@@ -1581,15 +1526,11 @@ SDAT4
 *12080 SUBEND
 
 l12000
-	bl *r5
-	data >4304
-	li r12,SDAT5
-	li r13,36
 	bl @vdpcpy
+	DATA >4304,SDAT5,36
 	
-	bl *r5
-	data >4784
 	BL @VDPSETF
+	data >4784
 	byte 0,128
 
 	li r0,4
@@ -1635,7 +1576,7 @@ SDAT5
 * SAT at >0300 (motion table at >0780, fixed)
 * different from XB - SPT at >0800
 * transparent on XB color 15
-VDPTAB  DATA >00E1,>0840,>0106,>010E
+VDPTAB  DATA >E108,>4001,>0601,>0E00
 
 * Write address - address is data after the fact
 WRADR1
@@ -1649,9 +1590,13 @@ WRADRF
 		MOVB R12,@>8C02
 		B *R11
 		
-* vdpsetf takes the byte and the count as bytes after the call
+* vdpsetf takes the address, byte and the count as bytes after the call
 * count of 255 or fewer bytes
 VDPSETF
+    mov *r11+,r12
+    mov r11,r13
+    bl @wradrf
+    mov r13,r11
 		movb *r11+,R12
 		clr r13
 		movb *r11+,@>811B	* r13 LSB
@@ -1729,12 +1674,24 @@ CHAR1	bl @wradrf
 		clr r13
 		movb *r14+,@>831b	* r13 LSB
 		mov *r14+,r12
-		MOV R14,R11		* make the below reusable
-* VDP Copy - source in R12, count in R13, VDP already set
-VDPCPY	MOVB *R12+,*r4
+CHAR2
+    MOVB *R12+,*r4  *inline vdpcpy since vdpcpy isn't embeddable now
+    DEC R13
+    JNE CHAR2
+    B *R14
+		
+* VDP Copy - follow with VDP adr, CPU addr, byte count (word)
+VDPCPY
+    MOV R11,R14
+    MOV *R14+,R12
+    BL @wradrf
+    mov *r14+,r12
+    mov *r14+,r13
+VDPCP1	
+    MOVB *R12+,*r4
 		DEC R13
-		JNE VDPCPY
-		B *R11
+		JNE VDPCP1
+		B *R14
 		
 * HCHARADR (also for vchar, gchar, etc)
 * R0,R1 to R12 for read
@@ -1809,23 +1766,21 @@ SCAN
 		lwpi >8300
 		b *r14
 		
-*KEY  Scan must be called first - RETURN 1=K
+*KEY  Scan must be called first - key in R1, RETURN EQ if fire is pressed
 KEY	
-		clr r1
 		movb @>8375,r1
-		swpb r1
+		SRL r1,8
+		CI R1,18
 		b *r11
 		
 * DSPRALL	DELETES ALL SPRITES
 DSPRALL	MOV R11,R14
-		bl *r5
-		data >4300
 		BL @VDPSETF
+		data >4300
 		byte >e1,128
 * and the automotion table
-		bl *r5
-		data >4780
 		BL @VDPSETF
+		data >4780
 		BYTE 0,128
 		B *R14
 
@@ -1911,36 +1866,48 @@ POSITION
 		bl @spriteadr
 		andi r12,>3fff    * want a read address
 		bl @wradrf
-		CLR R1
-		CLR R2
 		MOVB @>8800,R1
-		SWPB R1
+		SRL R1,8
 		MOVB @>8800,R2
-		SWPB R2
+		SRL R2,8
 		AI R2,3
 		INCT R1       * fix top line offset (-1 to 1)
 		ANDI R1,>00FF * mask it, it's supposed to wrap around
 		INC R2        * fix left column (0 to 1) (256 is okay)
 		B *R14
 
+* POSITIONRAW - same as POSITION but stores in RO,CO
+POSITIONRAW
+    MOV R11,R10
+    BL @POSITION
+  	mov r1,@ro
+	  mov r2,@co
+	  b *r10
 
-* set freq and call the duration you want (vol0)
+* duration 100, volume 0, pass tone as data words
 sound100
   li r0,6
+  MOV *R11+,R1
   jmp sv0
 
+* set freq and vol and come here (len 100) as data bytes
+soundvol
+  li r0,6
+  movb *r11+,r1
+  sra r1,8
+  movb *r11+,r2
+  srl r2,8
+  jmp sound
+
+* negative 100 duration, zero vol, load r1 for tone
 soundn100
   li r0,-6
   jmp sv0
 
+* 300 duration, zero vol, load r1 for tone
 sound300
   li r0,18
   jmp sv0
-
-* set freq and vol and come here (len 100)
-soundvol
-  li r0,6
-  jmp sound
 
 sv0
   clr r2
@@ -2036,9 +2003,9 @@ intw2
 		CLR r0
 		movb @>837b,r0
 * todo: dynamic cheat?		
-		andi r0,>2000
+*		andi r0,>2000
 * THIS LINE IS CHEATING
-*		andi r0,>0000
+		andi r0,>0000
 		B *R11
 
 * CDELAY - r0 number of times to call COINC
@@ -2092,13 +2059,13 @@ waitnewkey
 waitA		
 		bl @scan
 		bl @key
-		ci r1,18
+*		ci r1,18  (done in key)
 		jeq waitA
 waitB	
 		bl *r6		* delays and sound processing!
 		bl @scan
 		bl @key
-		ci r1,18
+*		ci r1,18 * done in key
 		jne waitB
 		
 		B *r10
