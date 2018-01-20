@@ -1,5 +1,9 @@
 ** The whole end sequence is messed up by the new speed
-** but otherwise it works.
+** Animframe is now 1-4 - this breaks the bad guy animation
+** Need new climb frames and jump frame
+** found a case where you can jump left off the edge of the screen
+* need to animate enemies too (birds and worms can now have 4 frames too)
+
 
 ************************
 * HeroX - by Tursi     *
@@ -143,8 +147,8 @@ FFBYTE
 		EVEN
 		
 CHARDAT1	
-		DATA >1038,>1010,>1810,>1018,>1038,>1010,>1810,>2844
-		data >081C,>0808,>1808,>0818,>081C,>0808,>1808,>1422
+*		DATA >1038,>1010,>1810,>1018,>1038,>1010,>1810,>2844
+*		data >081C,>0808,>1808,>0818,>081C,>0808,>1808,>1422
 		data >243C,>3C3C,>1818,>2424,>0000,>0000,>0000,>1866
 		data >0010,>3AFE,>3B11,>0000,>0008,>5C7F,>DC88,>0000
 		DATA >0000,>007E,>FFFF,>FFFF,>FF3C,>42A5,>A542,>3CFF
@@ -156,10 +160,23 @@ CHARDAT1
 		
 CHARDAT2
 		data >FFFE,>FFFE,>FFFE,>FFFE,>FFFE,>FCF1,>F1FC,>FEFF
-		
+
+* ladder and player animation		
 CHARDAT3
 		data >7E42,>4242,>7E42,>4242
-	
+
+		data >0c0c,>1818,>1818,>1818
+		data >0c0c,>1818,>1c18,>3808
+		data >0c0c,>1818,>1818,>1810
+		data >0c0c,>1838,>3c1c,>2420
+		data >0c0c,>385e,>1824,>4404
+		
+		data >3030,>1818,>1818,>1818
+		data >3030,>1818,>3818,>1c10
+		data >3030,>1818,>1818,>1808
+		data >3030,>181c,>3c38,>2404
+		data >3030,>1c7a,>1824,>2220
+			
 GOGAME	
 		LIMI 0				  * disable interrupts
 		LWPI >8300			* set correct workspace
@@ -214,7 +231,8 @@ INITL1
 *10030 READ A$ :: CALL CHAR(A,A$)
 *10040 NEXT A
 	bl @char
-	byte 96,152
+*	byte 96,152
+	byte 100,120
 	data chardat1
 	
 *10050 CALL CHAR(120,"FFFEFFFEFFFEFFFEFFFEFCF1F1FCFEFF")
@@ -224,7 +242,8 @@ INITL1
 	
 *10060 CALL CHAR(128,"7E4242427E424242")
 	bl @char
-	byte 128,8
+*	byte 128,8
+	byte 128,88
 	data chardat3
 
 *10120 SUBEND
@@ -293,7 +312,7 @@ l150
 *162 CALL HCHAR(23,4,97,NM)
 	li r0,23
 	li r1,4
-	li r2,97
+	li r2,138
 	mov @nm,r3
 	bl @hchar
 
@@ -306,7 +325,7 @@ l170
 
 *180 CALL SPRITE(#1,96,16,152,32)
 	bl @sprite
-	byte 1,153,32,96,15,0
+	byte 1,153,32,129,15,0		* player moved to 129
 
 	clr @rs
 	clr @cs
@@ -391,7 +410,7 @@ l210b
 *211 IF LE=5 THEN CALL PATTERN(#2,108+RND)
 * 2 is never used anywhere else, so can always animate
 	bl @animframe
-	ai r1,108
+	ai r1,107		* animframe = 1-4 (TODO: bad guy needs more frames)
 	li r0,2
 	bl *r7
 
@@ -465,13 +484,15 @@ l214
 l225
 
 *228 CALL PATTERN(#1,96-2*(X=-4)-AS)
-	li r1,96
+* player moved to 129, plus more frames
+* 0 = 129 or 134 (maybe just 129 for convenience)
+* animframe needs to return 1-4
+	li r1,134		
 *	mov @x,r0	* @X is still in r3
-  mov r3,r3
-  jlt l228c
-	jne l228b
+    mov r3,r3
+    jlt l228b
 l228c
-	inct r1
+	ai r1,-5
 l228b
 	bl @animframe
 	a r0,r1
@@ -794,8 +815,8 @@ l4020b
 	ai r2,-8
 	bl @locate
 	
-	li r1,98
-	bl @animframe
+	li r1,134
+	bl @animframe   * (1-4)
 	a r0,r1			* screw AN, I'm using AS (now in animframe)
 	mov r8,r0
 	bl *r7
@@ -947,7 +968,7 @@ l4190b
 	ci r0,15
 	jh l4190c
 	
-	li r1,96
+	li r1,129
 	bl @animframe
 	a r0,r1
 	mov r8,r0
@@ -1093,7 +1114,7 @@ l4390b
 	
 	li r0,9
 	mov @co,r1
-	li r2,97
+	li r2,138
 	bl @hchar1
 	
 	li r0,100
@@ -1598,8 +1619,8 @@ VDPSETF
     bl @wradrf
     mov r13,r11
 		movb *r11+,R12
-		clr r13
-		movb *r11+,@>811B	* r13 LSB
+		movb *r11+,R13
+		SRL R13,8
 * write byte in R12 MSB R13 times to VDP
 VDPSET	MOVB R12,*r4
 		DEC R13
@@ -1623,8 +1644,8 @@ CLEAR	mov r11,r10
 * followed by data bytes, row,col, data
 * r14 is the parent pointer
 DISPADR
-		clr r12
-		movb *R14+,@>8319	* r12 LSB
+		movb *R14+,R12
+		SRL R12,8
 		DEC R12
 		SLA R12,5
 		ab *r14+,@>8319		* I think this should always be safe, no wrap
@@ -1666,13 +1687,13 @@ DNUMLP
 *CHAR	0=CHAR, 1=NUMBER OF BYTES, 2=ADDRESS OF BYTES
 * Data statements after the call
 CHAR	MOV R11,R14
-		clr r12
-		movb *r14+,@>8319	* r12 LSB
+		movb *r14+,R12
+		SRL R12,8
 		SLA R12,3
 		AI R12,>4800
 CHAR1	bl @wradrf
-		clr r13
-		movb *r14+,@>831b	* r13 LSB
+		movb *r14+,R13
+		SRL R13,8
 		mov *r14+,r12
 CHAR2
     MOVB *R12+,*r4  *inline vdpcpy since vdpcpy isn't embeddable now
@@ -1714,17 +1735,17 @@ HCHARADR
 * byte too for an even return address.
 HCHARF
 		mov r11,r10
-		clr r0
-		clr r1
-		clr r2
-		clr r3
-		movb *r10+,@>8301
+		movb *r10+,r0
 HCHARF2
-		movb *r10+,@>8303
-		movb *r10+,@>8305
-		movb *r10+,@>8307
+		srl r0,8
+		movb *r10+,r1
+		srl r1,8
+		movb *r10+,r2
+		srl r2,8
+		movb *r10+,r3
+		srl r3,8
 		bl @hchar
-		movb *r10+,@>8301
+		movb *r10+,r0
 		jne HCHARF2
 		inc r10
 		b *r10
@@ -1751,9 +1772,8 @@ GCHAR	MOV R11,R14
 		bl @hcharadr
 		DATA >0000
 		bl @wradrf
-		CLR R2
 		MOVB @>8800,R2
-		SWPB R2
+		srl r2,8
 		B *R14
 		
 * scan - wrapped call to KSCAN
@@ -1789,15 +1809,15 @@ DSPRALL	MOV R11,R14
 * we have a lot of hchars...
 VCHARF
 		mov r11,r10
-		clr r0
-		clr r1
-		clr r2
-		clr r3
-		movb *r10+,@>8301
+		movb *r10+,r0
 VCHARF2		
-		movb *r10+,@>8303
-		movb *r10+,@>8305
-		movb *r10+,@>8307
+		srl r0,8
+		movb *r10+,r1
+		srl r1,8
+		movb *r10+,r2
+		srl r2,8
+		movb *r10+,r3
+		srl r3,8
 		
 * inline vchar
 		bl @hcharadr
@@ -1813,7 +1833,7 @@ VCHAR1	bl @wradrf
 *		SWPB R2				* this one doesn't need to preserve r2
 VCHAROUT		
 
-		movb *r10+,@>8301
+		movb *r10+,r0
 		jne VCHARF2
 		inc r10
 		b *R10
@@ -1829,8 +1849,8 @@ SPRITEADR
 * SPRITE 0=SPRITE+1, 1=ROW+2, 2=COL+1, 3=CHARACTER, 4=COLOR
 * passed as data bytes, not registers, color is NOT plus 1!
 SPRITE	MOV R11,R14
-		clr r0
-		movb *r14+,@>8301   * R1 LSB
+		movb *r14+,r0
+		srl r0,8
 		bl @SPRITEADR
 		bl @wradrf
 		movb *r14+,r12
@@ -1971,9 +1991,7 @@ PATTERN	MOV R11,R14
 		AI R12,>0302
 		ORI R12,>4000
 		bl @wradrf
-		SWPB R1
-		MOVB R1,*r4
-		SWPB R1
+		MOVB @>8303,*r4  * R1 LSB
 		B *R14
 		
 * COINC - (only ALL) return non-zero in r0 if set - uses cached copy, ints must run!
@@ -2000,7 +2018,6 @@ INTWAIT
 intw2
 
 * this is the actual coinc now
-		CLR r0
 		movb @>837b,r0
 * todo: dynamic cheat?		
 *		andi r0,>2000
@@ -2024,34 +2041,36 @@ MOTION
 		bl @spriteadr
 		AI R12,>0480   * need motion table
 		bl @wradrf
-		swpb r1
-		movb r1,*r4
-		swpb r1
-		swpb r2
-		movb r2,*r4
-		swpb r2
-		clr r12
-		movb r12,*r4
-		movb r12,*r4
+		movb @>8303,*r4  * R1 LSB
+		movb @>8305,*r4  * R2 LSB
+*		clr r12
+*		movb r12,*r4
+*		movb r12,*r4
+* we know R0 MSB must be zero
+		movb r0,*r4
+		movb r0,*r4
 		B *R14
 
 *delspr - r0 = sprite+1
 DELSPR
 		MOV R11,R14
-		MOV R0,R12
-		DEC R12
-		SLA R12,2
-		AI R12,>4300
+		bl @spriteadr
 		bl @wradrf
 		li r13,>E100			* sprite automotion doesn't allow values from c1-e0
 		movb r13,*r4
 		ai r12,>0480
 		bl @wradrf
-		clr r13
-		movb r13,*r4
-		movb r13,*r4
-		movb r13,*r4
-		movb r13,*r4
+*		clr r13
+*		movb r13,*r4
+*		movb r13,*r4
+*		movb r13,*r4
+*		movb r13,*r4
+* we know r0 msb must be zero
+		movb r0,*r4
+		movb r0,*r4
+		movb r0,*r4
+		movb r0,*r4
+
 		b *r14
 
 waitnewkey
@@ -2096,12 +2115,12 @@ snapcol
 		andi r2,>f8
 		jmp snapcommon
 
-* return 0 or 1 in r0 for an animation frame
+* return 1-4 (no 0) in r0 for an animation frame
 animframe
-		clr r0
 		movb @>8379,r0		* interrupt counter
-		srl r0,12
-		andi r0,1
+		srl r0,10
+		andi r0,3
+		inc r0
 		b *R11
 		
 		
