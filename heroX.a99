@@ -1,9 +1,8 @@
+** music/better sfx?? Replace call sound with sound lists?
 ** The whole end sequence is messed up by the new speed
-** Animframe is now 1-4 - this breaks the bad guy animation
-** Need new climb frames and jump frame
-** found a case where you can jump left off the edge of the screen
-* need to animate enemies too (birds and worms can now have 4 frames too)
-
+** over 4k again (sound and end routine updates hopefully will fix)
+** add a bonus countdown timer per level?
+** need last score on title page
 
 ************************
 * HeroX - by Tursi     *
@@ -146,41 +145,68 @@ FFBYTE
 		BYTE >FF
 		EVEN
 		
-CHARDAT1	
-*		DATA >1038,>1010,>1810,>1018,>1038,>1010,>1810,>2844
-*		data >081C,>0808,>1808,>0818,>081C,>0808,>1808,>1422
-		data >243C,>3C3C,>1818,>2424,>0000,>0000,>0000,>1866
-		data >0010,>3AFE,>3B11,>0000,>0008,>5C7F,>DC88,>0000
-		DATA >0000,>007E,>FFFF,>FFFF,>FF3C,>42A5,>A542,>3CFF
-		data >4428,>1010,>7C92,>3810,>183C,>282E,>081C,>3E14
-		DATA >1818,>3C18,>08F8,>0814,>3030,>7830,>9070,>1028
-		data >2418,>187E,>99BD,>1818,>081C,>0808,>0C08,>0818
-		data >0000,>3E22,>2A22,>3E00,>1038,>1010,>F010,>3050
-		data >66FF,>FFFF,>7E3C,>1800
+CHARDAT1
+		data >0000,>023E,>FB39,>0000	*  96	bird right
+		data >0000,>3AFE,>3B11,>0000	*  97
+		data >0000,>3AFE,>3B01,>0000	*  98
+		data >0000,>103A,>FE3B,>0100	*  99
 		
-CHARDAT2
-		data >FFFE,>FFFE,>FFFE,>FFFE,>FFFE,>FCF1,>F1FC,>FEFF
+		data >0000,>5C7F,>DC80,>0000	* 100	bird left
+		data >0000,>085C,>7FDC,>8000	* 101
+		data >0000,>407C,>DF9C,>0000	* 102
+		data >0000,>5C7F,>DC88,>0000	* 103
+
+		DATA >0000,>007E,>FFFF,>FFFF	* 104	hole
+		DATA >FF3C,>42A5,>A542,>3CFF	* 105	girder
+		data >4428,>1010,>7C92,>3810	* 106	player falling
+		DATA >183C,>382E,>1C3E,>1400	* 107	girl
+		DATA >1818,>3C18,>08F8,>0814	* 108	boss 1
+		DATA >3030,>7830,>9070,>1028	* 109	boss 2
+		data >1818,>3C18,>08F8,>0814	* 110	boss 3
+		DATA >3030,>7830,>1070,>9028	* 111	boss 4
+		data >0000,>3E22,>2A22,>3E00	* 112	crystal
+		data >2418,>187E,>99BD,>1818	* 113	boss die
+		data >66FF,>FFFF,>7E3C,>1800	* 114	heart
 
 * ladder and player animation		
 CHARDAT3
-		data >7E42,>4242,>7E42,>4242
+		data >7E42,>4242,>7E42,>4242	* 128
 
-		data >0c0c,>1818,>1818,>1818
-		data >0c0c,>1818,>1c18,>3808
-		data >0c0c,>1818,>1818,>1810
-		data >0c0c,>1838,>3c1c,>2420
-		data >0c0c,>385e,>1824,>4404
+		data >0c0c,>1818,>1c18,>3808	* right  129
+		data >0c0c,>1818,>1818,>1810	* 130
+		data >0c0c,>1838,>3c1c,>2420	* 131
+		data >0c0c,>385e,>1824,>4404	* 132 (legs out)
 		
-		data >3030,>1818,>1818,>1818
-		data >3030,>1818,>3818,>1c10
-		data >3030,>1818,>1818,>1808
-		data >3030,>181c,>3c38,>2404
-		data >3030,>1c7a,>1824,>2220
+		data >3030,>1818,>3818,>1c10	* left  133
+		data >3030,>1818,>1818,>1808	* 134
+		data >3030,>181c,>3c38,>2404	* 135
+		data >3030,>1c7a,>1824,>2220	* 136
+		
+		data >2038,>381C,>1C38,>2404	* climbing ladder 137
+		data >0038,>383E,>1838,>2404	* 138
+		data >041C,>1C38,>381C,>2420	* 139
+		data >001C,>1C7C,>181C,>2420	* 140
+		
+		data >0C0C,>385E,>1826,>4000	* 141 jump right
+		data >3030,>1C7A,>1864,>0200	* 142 jump left
+		
+		DATA >3030,>181C,>1828,>2828	* 143 player pre-punch
+		DATA >6060,>30F0,>3028,>2828	* 144 player punch
+
+* parts		
+		data >FFFE,>FFFE,>FFFE,>FFFE	* 145	machine
+		data >FFFE,>FCF1,>F1FC,>FEFF	* 146	broken machine
+		
+* worm enemy
+		data >0000,>0000,>0000,>1866	* 147
+		data >0000,>0000,>0018,>2424	* 148
+		data >0000,>0000,>0000,>1866	* 149
+		data >0000,>0000,>0000,>007e	* 150
 			
 GOGAME	
-		LIMI 0				  * disable interrupts
+		LIMI 0				* disable interrupts
 		LWPI >8300			* set correct workspace
-		LI R8,1				  * we reserve R8 to always be the value '1' to save some memory
+		LI R8,1				* we reserve R8 to always be the value '1' to save some memory
 		li r4,>8C00			* VDPWD
 		LI R5,wradr1		* R5 for wradr
 		LI R6,coinc			* r6 for coinc
@@ -200,6 +226,7 @@ INITL1
 		LI R12,>E11F	* 16k, screen on, ints on, magnify 1 (differs from XB) & automotion limit
 		MOVB R12,@>83d4 * put VDP R1 at the KSCAN reload
 		SWPB R12
+		LI R0,>0F00		* 15 sprites moving
 		MOVB R0,@>837A	* automotion limit
 
 * we won't call CLEAR, user can do that, but we do
@@ -231,19 +258,15 @@ INITL1
 *10030 READ A$ :: CALL CHAR(A,A$)
 *10040 NEXT A
 	bl @char
-*	byte 96,152
-	byte 100,120
+	byte 96,152
 	data chardat1
 	
 *10050 CALL CHAR(120,"FFFEFFFEFFFEFFFEFFFEFCF1F1FCFEFF")
-	bl @char
-	byte 120,16
-	data chardat2
+* merged into chardat3, new chars
 	
 *10060 CALL CHAR(128,"7E4242427E424242")
 	bl @char
-*	byte 128,8
-	byte 128,88
+	byte 128,184
 	data chardat3
 
 *10120 SUBEND
@@ -310,11 +333,7 @@ l150
 	bl @draw
 
 *162 CALL HCHAR(23,4,97,NM)
-	li r0,23
-	li r1,4
-	li r2,138
-	mov @nm,r3
-	bl @hchar
+	bl @showlives
 
 *165 DISPLAY AT(24,1):SC
 	bl @disnum
@@ -325,7 +344,7 @@ l170
 
 *180 CALL SPRITE(#1,96,16,152,32)
 	bl @sprite
-	byte 1,153,32,129,15,0		* player moved to 129
+	byte 1,153,32,132,15,0		* player moved to 129-132
 
 	clr @rs
 	clr @cs
@@ -347,18 +366,19 @@ l210
 * new movement code
 	mov @ij,r0
 	jeq l210b
-
+	
 * handle ongoing jump (or fall)
 	inc @rs
 	mov @rs,r3
-	ci r3,24    * max fall speed
+	ci r3,24    	* max fall speed
 	jlt jump2
 	b @l2000		* die if fall too far
 jump2
 	mov r8,r0
 	bl @position
 	a @cs,r2
-	jeq jump2b
+	ci r2,4
+	jl jump2b
 	ci r2,249
 	jl jump3
 jump2b
@@ -368,13 +388,13 @@ jump3
 	a r3,r1			* add to position
 	ci r1,187
 	jlt jump4
-	ci r1,220   * don't die for wraparound
+	ci r1,220   	* don't die for wraparound
 	jgt jump4   
 	b @l2000		* die if fall off bottom
 jump4
 	mov r1,@ro
 	mov r2,@co
-	bl @locate	* move sprite into place
+	bl @locate		* move sprite into place
 
 	mov @rs,r0
 	jlt jump5		* skip if moving up
@@ -387,6 +407,15 @@ jump4
 	jeq jump5
 	clr @ij			* landed
 	bl @snaprow	* snap row
+
+	li r1,136
+	mov @cs,r0
+	jlt jump4b
+	ai r1,-4
+jump4b
+	mov r8,r0
+	bl @pattern	
+	
 jump5
 	bl *r6			* coinc
 	mov r0,r0
@@ -410,7 +439,7 @@ l210b
 *211 IF LE=5 THEN CALL PATTERN(#2,108+RND)
 * 2 is never used anywhere else, so can always animate
 	bl @animframe
-	ai r1,107		* animframe = 1-4 (TODO: bad guy needs more frames)
+	ai r1,107		* animframe = 1-4
 	li r0,2
 	bl *r7
 
@@ -441,8 +470,9 @@ l260b
 	ci r2,128
 	jne l214		* allow x if y is illegal
 
+	bl @animframe
+	ai r1,136
 	mov r8,r0
-	li r1,100
 	bl *r7
 	
 	mov r8,r0
@@ -472,7 +502,8 @@ l214
 *220 CO=CO+X*2 :: if CO<1 or CO>255 then 225
 	mov @cs,r3
 	a r3,r2		  * SLA and a 16-bit value don't work for negative
-	jeq l225	  * handles 0
+	ci r2,4
+	jl l225
 	ci r2,248
 	jh l225		  * handles > 248 or negative (255 was uneven)
 
@@ -484,18 +515,17 @@ l214
 l225
 
 *228 CALL PATTERN(#1,96-2*(X=-4)-AS)
-* player moved to 129, plus more frames
+* player moved to 129-132, plus more frames
 * 0 = 129 or 134 (maybe just 129 for convenience)
 * animframe needs to return 1-4
-	li r1,134		
+	bl @animframe
+	ai r1,132		
 *	mov @x,r0	* @X is still in r3
     mov r3,r3
     jlt l228b
 l228c
-	ai r1,-5
+	ai r1,-4
 l228b
-	bl @animframe
-	a r0,r1
 	mov r8,r0
 	bl *r7
 
@@ -512,6 +542,14 @@ l300b
 	seto @ij
 	li r0,-10
 	mov r0,@rs
+
+	li r1,142
+	mov @cs,r0
+	jlt l310b
+	dec r1
+l310b	
+	mov r8,r0
+	bl @pattern
 	
 *330 CALL SOUND(100,-3,15)
 	bl @soundvol
@@ -558,25 +596,23 @@ l410b
 * any object there prevents it!
 *421 CALL GCHAR(1,5,QW) :: IF QW<>32 THEN 440
 * not doing for ROM space, the vchar is fast enough
-*	mov r8,r0
-*	li r1,5
-*	bl @gchar
-*	ci r2,32
-*	jne l440
 
 *425 RO=1 :: CO=5
 *430 CALL GCHAR(RO,CO,QW) :: IF QW=32 THEN CALL HCHAR(RO,CO,128) :: RO=RO+1 :: GOTO 430
-* unneeded, we'll just do a blind vchar
-  bl @vcharf
-  byte 1,5,128,4
-  byte 0,0
+* unneeded, we'll just do a blind vchar, unless on level 5
+	mov @le,r0
+	ci r0,4
+	jh l430b
+	
+    bl @vcharf
+    byte 1,5,128,4
+    byte 0,0
+l430b
   
 * main game loops around here
 *435 GOTO 210
-*l435
-*	b @l210
+* Not done now, need the full loop
 
-* if no ladder draw, then we come here
 * if row (character) is less than 3, then we must have climbed to the top - do win routine
 * newly, also check wafers and jumping to avoid cheating ;)
 *440 IF RO<3 THEN 1000
@@ -698,11 +734,7 @@ l2030
 
 *2050 NM=NM-1 :: CALL HCHAR(23,4,97,NM)
 	dec @nm
-	li r0,23
-	li r1,4
-	li r2,97
-	mov @nm,r3
-	bl @hchar
+	bl @showlives
 
 *2060 IF NM=0 THEN 3000
 	mov @nm,r0
@@ -815,9 +847,8 @@ l4020b
 	ai r2,-8
 	bl @locate
 	
-	li r1,134
 	bl @animframe   * (1-4)
-	a r0,r1			* screw AN, I'm using AS (now in animframe)
+	ai r1,132
 	mov r8,r0
 	bl *r7
 	
@@ -830,7 +861,7 @@ l4020c
 * prepare to punch
 *4030 CALL PATTERN(#1,111) :: FOR A=1 TO 200 :: NEXT A
 	mov r8,r0
-	li r1,111
+	li r1,143
 	bl *r7
 
 	li r0,5
@@ -839,7 +870,7 @@ l4020c
 * punch
 *4040 CALL PATTERN(#1,113) :: CALL SOUND(100,-6,10)
 	mov r8,r0
-	li r1,113
+	li r1,144
 	bl *r7
 	
 	bl @soundvol
@@ -849,7 +880,7 @@ l4020c
 * drop villian
 *4050 CALL PATTERN(#2,110) :: CALL MOTION(#2,18,0)
 	li r0,2
-	li r1,110
+	li r1,113
 	bl *r7
 	
 	li r1,18
@@ -916,7 +947,7 @@ l4070
 * prepare to punch
 *4130 CALL PATTERN(#1,111)
 	mov r8,r0
-	li r1,111
+	li r1,143
 	bl *r7
 
 *4140 FOR A=1 TO 50 :: NEXT A
@@ -925,7 +956,7 @@ l4070
 * punch
 *4150 CALL PATTERN(#1,113)
 	mov r8,r0
-	li r1,113
+	li r1,144
 	bl *r7
 	
 *4160 CALL SOUND(100,-6,4)
@@ -938,7 +969,7 @@ l4070
 * erase 'help'
 *4175 DISPLAY AT(1,10):"    ";
 	bl @hcharf
-	byte 6,3,121,1
+	byte 6,3,146,1
 	byte 1,12,32,4,0,0
 	
 	mov r8,r0
@@ -968,9 +999,8 @@ l4190b
 	ci r0,15
 	jh l4190c
 	
-	li r1,129
 	bl @animframe
-	a r0,r1
+	ai r1,128
 	mov r8,r0
 	bl *r7
 	
@@ -1103,18 +1133,16 @@ l4320b
 	mov r0,@co
 	
 *4390 FOR A=1 TO NM :: CALL SOUND(100,1000,0) :: CALL HCHAR(9,CO,97) :: SC=SC+100 :: DISPLAY AT(24,1):SC
-	mov r8,@a
 l4390b
-	mov @a,r0
-	c r0,@nm
-	jh l4400b
+	mov @nm,r0
+	jeq l4400b
 	
 	bl @sound100
 	data 1000
 	
 	li r0,9
 	mov @co,r1
-	li r2,138
+	li r2,136
 	bl @hchar1
 	
 	li r0,100
@@ -1127,16 +1155,11 @@ l4390b
 	byte 23,4,32,5,0,0
 	
 	dec @nm
-	
-	li r0,23
-	li r1,4
-	li r2,97
-	mov @nm,r3
-	bl @hchar
-	
+
+	bl @showlives
+
 	inc @co
 	
-	inc @a
 	jmp l4390b
 l4400b
 	
@@ -1184,6 +1207,7 @@ DRAW
 JTABLE
 	DATA l10160,l10300,l10400,l10500,l10600
 
+** Level 1 **
 *10160 CALL HCHAR(5,1,105,32)
 *10170 CALL HCHAR(10,1,105,32)
 *10180 CALL HCHAR(15,1,105,32)
@@ -1208,7 +1232,7 @@ l10160
 *10220 CALL VCHAR(9,4,128,6)
 *10230 CALL VCHAR(14,29,128,8)
 	bl @vcharf
-	byte 4,29,128,6
+	byte 4,29,128,6  * tweaked
 	byte 9,4,128,6
 	byte 14,29,128,8
 	byte 0,0
@@ -1216,6 +1240,7 @@ l10160
 *10280 SUBEXIT
 	b *r15
 	
+** Level 2 **	
 *10300 CALL HCHAR(5,1,105,32)
 *10310 CALL HCHAR(10,1,105,32)
 *10320 CALL HCHAR(15,1,105,32)
@@ -1243,7 +1268,8 @@ l10300
 	
 *10390 SUBEXIT
 	b *r15
-	
+
+** Level 3 **	
 *10400 CALL HCHAR(4,1,105,32)
 *10405 CALL HCHAR(10,1,105,32)
 *10410 CALL HCHAR(17,1,105,32)
@@ -1256,13 +1282,13 @@ l10300
 *10460 CALL HCHAR(20,14,112)
 l10400
 	bl @hcharf
-	byte 4,1,105,32
+	byte 5,1,105,32
 	byte 10,1,105,32
 	byte 17,1,105,32
 	byte 22,3,105,6
 	byte 21,11,105,6
 	byte 20,19,105,6
-	byte 3,31,112,1
+	byte 4,31,112,1
 	byte 9,2,112,1
 	byte 16,30,112,1
 	byte 20,14,112,1
@@ -1272,7 +1298,7 @@ l10400
 *10435 CALL VCHAR(9,4,128,8)
 *10440 CALL VCHAR(16,23,128,4)
 	bl @vcharf
-	byte 3,29,128,7
+	byte 4,29,128,6
 	byte 9,4,128,8
 	byte 16,23,128,4
 	byte 0,0
@@ -1280,6 +1306,7 @@ l10400
 *10465 SUBEXIT
 	b *r15
 
+** Level 4 **
 *10500 CALL HCHAR(4,7,105,12)
 *10505 CALL HCHAR(4,21,105,4)
 *10510 CALL HCHAR(4,27,105,4)
@@ -1321,7 +1348,7 @@ l10500
 *10573 CALL VCHAR(3,30,128,4)
 	bl @vcharf
 	byte 3,8,128,4
-	byte 6,5,128,4
+	byte 5,5,128,5
 	byte 9,29,128,5
 	byte 13,23,128,7
 	byte 3,30,128,4
@@ -1330,6 +1357,7 @@ l10500
 *10595 SUBEXIT
 	b *r15
 	
+** Level 5 **	
 *10600 CALL HCHAR(3,9,105,12)
 *10605 CALL HCHAR(7,3,105,28)
 *10610 CALL HCHAR(12,3,105,28)
@@ -1355,7 +1383,7 @@ l10600
 	byte 6,29,128,6
 	byte 11,4,128,6
 	byte 16,29,128,6
-	byte 4,3,120,3
+	byte 4,3,145,3
 	byte 0,0
 	
 *10650 DISPLAY AT(1,10):"HELP"
@@ -1380,6 +1408,7 @@ SHAPES
 	
 JTAB2 data l10720,l10800,l10900,l11000,l12000
 
+** Level 1 **
 *10720 FOR A=1 TO 3 :: CALL SPRITE(#A+3,101,5,16,A*80,0,5) :: NEXT A
 *10730 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,-5) :: NEXT A
 *10740 FOR A=1 TO 3 :: CALL SPRITE(#A+9,101,5,96,A*80,0,5) :: NEXT A
@@ -1415,11 +1444,12 @@ l10720b
 	b *r10
 
 SDAT1
-	BYTE 15,80,101,5,15,160,101,5,15,240,101,5
-	byte 55,80,101,5,55,160,101,5,55,240,101,5
-	byte 95,80,101,5,95,160,101,5,95,240,101,5	
-	byte 151,80,101,5,151,160,101,5,151,240,101,5	
+	BYTE 15,80,101,4,15,160,101,4,15,240,101,4
+	byte 55,80,101,4,55,160,101,4,55,240,101,4
+	byte 95,80,101,4,95,160,101,4,95,240,101,4	
+	byte 151,80,101,4,151,160,101,4,151,240,101,4
 
+** Level 2 **
 *10800 FOR A=1 TO 2 :: CALL SPRITE(#A+3,101,5,16,A*100,0,5) :: NEXT A
 *10810 FOR A=1 TO 2 :: CALL SPRITE(#A+5,101,5,56,A*100,0,-5)
 *10815 NEXT A
@@ -1456,11 +1486,12 @@ l10800b
 	b *r10
 
 SDAT2
-	byte 15,100,101,5,15,200,101,5
-	byte 55,100,101,5,55,200,101,5
-	byte 95,100,101,5,95,200,101,5
-	byte 151,100,101,5,151,200,101,5
+	byte 15,100,101,4,15,200,101,4
+	byte 55,100,101,4,55,200,101,4
+	byte 95,100,101,4,95,200,101,4
+	byte 151,100,101,4,151,200,101,4
 
+** Level 3 **
 *10900 FOR A=1 TO 3 :: CALL SPRITE(#A+3,101,5,8,A*80,0,5) :: NEXT A
 *10910 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,-5) :: NEXT A
 *10920 FOR A=1 TO 3 :: CALL SPRITE(#A+9,101,5,112,A*80,0,5) :: NEXT A
@@ -1496,11 +1527,12 @@ l10900b
 	b *r10
 
 SDAT3
-	byte 7,80,101,5,7,160,101,5,7,240,101,5
-	byte 55,80,101,5,55,160,101,5,55,240,101,5
-	byte 111,80,101,5,111,160,101,5,111,240,101,5
-	byte 135,100,103,3
+	byte 15,80,101,4,15,160,101,4,15,240,101,4
+	byte 55,80,101,4,55,160,101,4,55,240,101,4
+	byte 111,80,101,4,111,160,101,4,111,240,101,4
+	byte 135,100,100,3
 
+** Level 4 **
 *11000 CALL SPRITE(#4,101,14,8,100)
 *11010 CALL SPRITE(#6,103,3,32,100,0,-5)
 *11020 FOR A=1 TO 3 :: CALL SPRITE(#A+6,101,5,56,A*80,0,5) :: NEXT A
@@ -1532,10 +1564,11 @@ l11000
 	b *r10
 
 SDAT4
-	byte 7,103,101,13,>d2,0,0,0,31,100,103,2
+	byte 7,100,147,13,>d2,0,0,0,31,100,100,3
 	byte 55,80,101,4,55,160,101,4,55,240,101,4
-	byte 87,80,103,2
+	byte 87,80,100,3
 
+** Level 5 **
 *12000 CALL SPRITE(#2,108,2,32,24)
 *12010 CALL SPRITE(#3,107,10,1,72)
 *12020 CALL SPRITE(#4,102,3,56,100,0,5)
@@ -1575,9 +1608,9 @@ l12000
 	b *r10
 
 SDAT5
-	byte 31,23,108,1,0,72,107,9,55,100,102,2
+	byte 31,23,108,1,1,72,107,9,55,100,96,2
 	byte 79,80,104,14,79,160,104,14
-	byte 95,100,103,2,119,100,104,14,135,50,102,2
+	byte 95,100,100,3,119,100,104,14,135,50,96,2
 	byte 159,100,104,14
 
 **********************************
@@ -1601,11 +1634,11 @@ VDPTAB  DATA >E108,>4001,>0601,>0E00
 
 * Write address - address is data after the fact
 WRADR1
-    MOV *r11+,r12
+		MOV *r11+,r12
     
 * write address - R12 has word ready to write with tags
 WRADRF
-    SWPB R12
+		SWPB R12
 		MOVB R12,@>8C02
 		SWPB R12
 		MOVB R12,@>8C02
@@ -1779,12 +1812,11 @@ GCHAR	MOV R11,R14
 * scan - wrapped call to KSCAN
 * after this, KEY and JOYST just read the return variables
 SCAN
-		mov r11,r14
 		movb @>8311,@>8374	* R8 LSB - mode 1 - scans keyboard and joystick
 		lwpi >83e0		* GPLWS
 		bl @>000e		* scan
 		lwpi >8300
-		b *r14
+		b *r11
 		
 *KEY  Scan must be called first - key in R1, RETURN EQ if fire is pressed
 KEY	
@@ -1890,7 +1922,7 @@ POSITION
 		SRL R1,8
 		MOVB @>8800,R2
 		SRL R2,8
-		AI R2,3
+		AI R2,3		  * positioning offset - hacky but helps the original alignment code
 		INCT R1       * fix top line offset (-1 to 1)
 		ANDI R1,>00FF * mask it, it's supposed to wrap around
 		INC R2        * fix left column (0 to 1) (256 is okay)
@@ -1901,8 +1933,8 @@ POSITIONRAW
     MOV R11,R10
     BL @POSITION
   	mov r1,@ro
-	  mov r2,@co
-	  b *r10
+	mov r2,@co
+	b *r10
 
 * duration 100, volume 0, pass tone as data words
 sound100
@@ -2017,6 +2049,70 @@ INTWAIT
 		MOVB R0,@>8400
 intw2
 
+* inline anim - uses temp workspace!
+* sprite enemy animation. we can skip #1 (player) and #2 (boss)
+* the rest we sort of cheat and do by color
+* 2 = bird	
+* 4 = worm	147
+* kind of wasteful I guess, but it works
+spranim
+		lwpi >8380		* GPL stack, should be safe - all regs free
+		
+		li r12,>030B	* color of sprite 3
+
+		bl @animframe	* loads R1 with 1-4
+		li r13,95		* bird right
+		a r1,r13
+		li r14,146		* worm
+		a r1,r14
+		ai r1,99		* bird left
+		
+		li r2,13		* highest sprite used is #15
+		clr r3
+
+sprlp
+		bl @WRADRF
+		movb @>8800,r3
+		ci r3,>0200
+		jne notbird1
+
+* bird right here
+		li r0,>839b			* LSB R13
+		jmp changeit
+
+notbird1
+		ci r3,>0300
+		jne notbird2
+
+* bird left here
+		li r0,>8383			* LSB R1
+		jmp changeit
+
+notbird2
+		ci r3,>0400
+		jne notworm
+
+* worm here
+		li r0,>839d			* LSB R14
+		jmp changeit
+
+notworm
+		ai r12,4		* skip ahead to next sprite
+		dec r2
+		jne sprlp
+		jmp sprdone
+
+* changes the sprite pattern from address r0
+changeit		
+		dect r12
+		bl @wradrf			* sets read address and auto-increments
+		movb *r0,@>8c00
+		inct r12
+		jmp notworm
+		
+sprdone
+		lwpi >8300			* back to default
+
 * this is the actual coinc now
 		movb @>837b,r0
 * todo: dynamic cheat?		
@@ -2043,9 +2139,6 @@ MOTION
 		bl @wradrf
 		movb @>8303,*r4  * R1 LSB
 		movb @>8305,*r4  * R2 LSB
-*		clr r12
-*		movb r12,*r4
-*		movb r12,*r4
 * we know R0 MSB must be zero
 		movb r0,*r4
 		movb r0,*r4
@@ -2060,11 +2153,6 @@ DELSPR
 		movb r13,*r4
 		ai r12,>0480
 		bl @wradrf
-*		clr r13
-*		movb r13,*r4
-*		movb r13,*r4
-*		movb r13,*r4
-*		movb r13,*r4
 * we know r0 msb must be zero
 		movb r0,*r4
 		movb r0,*r4
@@ -2115,13 +2203,22 @@ snapcol
 		andi r2,>f8
 		jmp snapcommon
 
-* return 1-4 (no 0) in r0 for an animation frame
+* return 1-4 (no 0) in r1 for an animation frame
 animframe
-		movb @>8379,r0		* interrupt counter
-		srl r0,10
-		andi r0,3
-		inc r0
+		movb @>8379,r1		* interrupt counter
+		srl r1,10
+		andi r1,3
+		inc r1
 		b *R11
+
+* display the number of lives remaining
+showlives
+		li r0,23
+		li r1,4
+		li r2,136
+		mov @nm,r3
+		b @hchar		* hchar handles the return for us
+		
 		
 		
 		END
