@@ -1,5 +1,3 @@
-** The whole end sequence is messed up by the new speed
-** over 4k again (end routine updates hopefully will fix?)
 ** add a bonus countdown timer per level?
 ** need last score on title page
 
@@ -65,6 +63,7 @@ co  bss 2	* column (same)
 rs  bss 2	* row speed (used for jumping)
 cs  bss 2   * column speed (used for jumping)
 ij  bss 2   * is jumping (wasteful, but we can afford it)
+save bss 2	* extra return address
 
 * SHARED VARIABLES
 ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
@@ -252,7 +251,7 @@ GOGAME
 		li r4,>8C00			* VDPWD
 		LI R5,wradr1		* R5 for wradr
 		LI R6,coinc			* r6 for coinc
-		LI R7,pattern		* r7 for pattern
+		LI R7,pattern1		* r7 for pattern1 (pattern for player1)
 		li r9,motion		* r9 for motion
 
 * inline initvdp
@@ -456,8 +455,7 @@ jump4
 	jlt jump4b
 	ai r1,-4
 jump4b
-	mov r8,r0
-	bl @pattern	
+	bl *r7			* pattern1
 	
 jump5
 	bl *r6			* coinc
@@ -484,7 +482,7 @@ l210b
 	bl @animframe
 	ai r1,107		* animframe = 1-4
 	li r0,2
-	bl *r7
+	bl @pattern
 
 *212 IF X=0 AND Y=0 THEN GOTO 300
 * omitted for ROM space
@@ -515,8 +513,7 @@ l260b
 
 	bl @animframe
 	ai r1,136
-	mov r8,r0
-	bl *r7
+	bl *r7			* pattern1
 	
 	mov r8,r0
 	bl @position
@@ -569,8 +566,7 @@ l225
 l228c
 	ai r1,-4
 l228b
-	mov r8,r0
-	bl *r7
+	bl *r7		* pattern1
 
 *300 CALL KEY(C,K,S) :: IF K<>18 THEN 400
 l300
@@ -591,8 +587,7 @@ l300b
 	jlt l310b
 	dec r1
 l310b	
-	mov r8,r0
-	bl @pattern
+	bl *r7		* pattern1
 	
 *330 CALL SOUND(100,-3,15)
 	bl @playsound
@@ -607,7 +602,7 @@ l400
 	bl @positionraw
 	bl @pix2char
 	inc r0
-	mov r0,@ro
+	mov r0,@ro		* NOTE! For this block ro,co are CHARACTER positions
 	mov r1,@co
 
 	bl @gchar
@@ -717,20 +712,12 @@ l2000
 
 *2005 FOR A=4 TO 16 :: CALL MOTION(#A,0,0) :: NEXT A
 	li r0,4
-	mov r0,@a
 l2005b
-	mov @a,r0
-	ci r0,16
-	jh l2005c
-	
-	mov @a,r0
-	clr r1
-	clr r2
-	bl *r9
-	
-	inc @a
-	jmp l2005b
-l2005c
+	bl @fixmotion2
+	byte 0,0
+	inc r0
+	ci r0,17
+	jl l2005b
 
 * I like it the way it is, sound effect, then fall. Lets you see what killed you.
 *2010 FOR A=990 TO 110 STEP-110 :: CALL SOUND(-100,A,0) :: NEXT A
@@ -740,13 +727,11 @@ l2005c
 
 * falling here
 *2020 CALL PATTERN(#1,106) :: CALL MOTION(#1,16,0)
-	mov r8,r0
 	li r1,106
-	bl *r7
+	bl *r7			* pattern1
 	
-	li r1,16
-	clr r2
-	bl *r9
+	bl @fixmotion
+	byte 0,1,16,0
 
 *2030 CALL POSITION(#1,RO,CO) :: IF RO<200 THEN 2030
 l2030	
@@ -790,10 +775,10 @@ l3000
 	mov r8,@a
 l3020b
 	mov @a,r0
-	ci r0,50
+	ci r0,100
 	jh l3040b
 
-	bl *r6			* slow it down a bit, this is just a timeout delay
+	bl *r6		* slow it down a bit, this is just a timeout delay
 	bl @scan
 	bl @key
 *	ci r1,18    * done in key
@@ -818,66 +803,35 @@ l4000
 
 * back down the ladder
 *4010 FOR A=1 TO 4 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO+8,CO) :: FOR B=1 TO 40 :: NEXT B :: NEXT A
-	mov r8,@a
-l4010b
-	mov @a,r0
-	ci r0,4
-	jh l4010c
-	
-	mov r8,r0
-	bl @position
-	ai r1,8
-	bl @locate
-	
-	bl *r6				* coinc for delay instead
-	
-	inc @a
-	jmp l4010b
-l4010c
+	bl @animmove
+	byte 0,2,128,13
 
+	bl @animmove
+	byte 2,0,136,16
+	
 *4015 CALL PATTERN(#1,99)
-	mov r8,r0
-	li r1,99
-	bl *r7
+* not needed - loop below animates
 
 * walk to the villian
 *4020 FOR A=1 TO 13 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO-8) :: CALL PATTERN(#1,98+AN) :: AN=-(AN=0) :: FOR B=1 TO 40 :: NEXT B :: NEXT A
-	mov r8,@a
-l4020b
-	mov @a,r0
-	ci r0,13
-	jh l4020c
+	bl @animmove
+	byte 0,-2,132,52
 	
-	mov r8,r0
-	bl @position
-	ai r2,-8
-	bl @locate
-	
-	bl @animframe   * (1-4)
-	ai r1,132
-	mov r8,r0
-	bl *r7
-	
-	bl *r6			* coinc for delay instead
-	
-	inc @a
-	jmp l4020b
-l4020c
-	
+	bl @cdelay
+	data 5
+
 * prepare to punch
 *4030 CALL PATTERN(#1,111) :: FOR A=1 TO 200 :: NEXT A
-	mov r8,r0
 	li r1,143
-	bl *r7
+	bl *r7			* pattern1
 
-	li r0,5
 	bl @cdelay
+	data 10
 
 * punch
 *4040 CALL PATTERN(#1,113) :: CALL SOUND(100,-6,10)
-	mov r8,r0
 	li r1,144
-	bl *r7
+	bl *r7			* pattern1
 	
 	bl @playsound
 	data punchsnd-firstsnd+>2500
@@ -886,19 +840,18 @@ l4020c
 *4050 CALL PATTERN(#2,110) :: CALL MOTION(#2,18,0)
 	li r0,2
 	li r1,113
-	bl *r7
+	bl @pattern
 	
-	li r1,18
-	clr r2
-	bl *r9
+	bl @fixmotion2
+	byte 18,0
 
-	bl *r6			* delay
+	bl @cdelay		* delay
+	data 10
 
 * unpunch
 *4060 CALL PATTERN(#1,98)
-	mov r8,r0
-	li r1,98
-	bl *r7
+	li r1,136
+	bl *r7			* pattern1
 
 * wait for villian fall to end
 *4070 CALL POSITION(#2,RO,CO) :: IF RO<200 THEN 4070
@@ -912,37 +865,27 @@ l4070
 
 * delete villian
 *4080 CALL DELSPRITE(#2)
-	li r0,2
+*	li r0,2
 	bl @delspr
 	
 * move up to machine	
 *4090 CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO-8)
-	mov r8,r0
-	bl @positionraw
-	ai r2,-8
-	bl @locate
-	bl *r6
-
 *4100 CALL LOCATE(#1,RO,CO-16)
-	mov r8,r0
-	mov @ro,r1
-	mov @co,r2
-	ai r2,-16
-	bl @locate
-	bl *r6
-	
+	bl @animmove
+	byte 0,-2,132,6
+
 * wait	
 *4110 FOR A=1 TO 200 :: NEXT A
-	li r0,5
 	bl @cdelay
+	data 40
 	
 * display '?'	
 *4120 CALL HCHAR(4,5,63) :: FOR A=1 TO 300 :: NEXT A :: CALL HCHAR(4,5,32)
 	bl @hcharf
 	byte 4,5,63,1,0,0
 	
-	li r0,7
 	bl @cdelay
+	data 10
 	
 	bl @hcharf
 	byte 4,5,32,1,0,0
@@ -951,18 +894,17 @@ l4070
 
 * prepare to punch
 *4130 CALL PATTERN(#1,111)
-	mov r8,r0
 	li r1,143
-	bl *r7
+	bl *r7			* pattern1
 
 *4140 FOR A=1 TO 50 :: NEXT A
-	bl *r6
+	bl @cdelay
+	data 10
 
 * punch
 *4150 CALL PATTERN(#1,113)
-	mov r8,r0
 	li r1,144
-	bl *r7
+	bl *r7			* pattern1
 	
 *4160 CALL SOUND(100,-6,4)
 	bl @playsound
@@ -970,114 +912,58 @@ l4070
 	
 * break machine and unpunch	
 *4170 CALL HCHAR(6,3,121) :: CALL PATTERN(#1,98)
-* erase 'help'
+* erase 'help' too
 *4175 DISPLAY AT(1,10):"    ";
 	bl @hcharf
 	byte 6,3,146,1
 	byte 1,12,32,4,0,0
 	
-	mov r8,r0
-	li r1,98
-	bl *r7
+	bl @cdelay
+	data 10
+	
+	li r1,136
+	bl *r7			* pattern1
 	
 * turn off all the enemies	
 *4180 FOR A=4 TO 16 :: CALL DELSPRITE(#A) :: NEXT A
 	li r0,4
-	mov r0,@a
 l4180b
-	mov @a,r0
-	ci r0,16
-	jh l4180c
-	
 	bl @delspr
+	inc r0
+	ci r0,17
+	jl l4180b
 	
-	inc @a
-	jmp l4180b
-l4180c
+	bl @cdelay
+	data 10
 
 * move back to ladder
 *4190 FOR A=1 TO 15 :: CALL PATTERN(#1,96+AN) :: AN=-(AN=0) :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO,CO+8) :: FOR B=1 TO 50 :: NEXT B :: NEXT A
-	mov r8,@a
-l4190b	
-	mov @a,r0
-	ci r0,15
-	jh l4190c
-	
-	bl @animframe
-	ai r1,128
-	mov r8,r0
-	bl *r7
-	
-	mov r8,r0
-	bl @position
-	ai r2,8
-	bl @locate
-	
-	bl *r6
-	
-	inc @a
-	jmp l4190b
-l4190c
+	bl @animmove
+	byte 0,2,128,58
 
 *4200 CALL PATTERN(#1,100)
-	mov r8,r0
-	li r1,100
-	bl *r7
+* not needed - animation below handles it
 	
 * move up ladder
 *4210 FOR A=1 TO 4 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO-8,CO) :: FOR B=1 TO 20 :: NEXT B :: NEXT A
-	mov r8,@a
-l4210b
-	mov @a,r0
-	ci r0,4
-	jh l4210c
-	
-	mov r8,r0
-	bl @position
-	ai r1,-8
-	bl @locate
-	
-	bl *r6
-	
-	inc @a
-	jmp l4210b
-l4210c
+	bl @animmove
+	byte -2,0,136,16
 
 *4220 CALL PATTERN(#1,98)
-	mov r8,r0
-	li r1,98
-	bl *r7
+* Not needed - animation below gets it
 
 * move to girl
 *4230 FOR A=1 TO 4 :: CALL POSITION(#3,RO,CO) :: CALL LOCATE(#3,RO,CO-8) :: FOR B=1 TO 75 :: NEXT B :: NEXT A
-	mov r8,@a
-l4230b
-	mov @a,r0
-	ci r0,4
-	jh l4230c
-	
-	mov r8,r0
-	bl @position
-	ai r2,-8
-	bl @locate
-	
-	bl *r6
-	bl *r6
-	
-	inc @a
-	jmp l4230b
-l4230c
+	bl @animmove
+	byte 0,-2,132,14
 
 * heart <3
 *4240 CALL SPRITE(#4,114,9,1,94)
 	bl @sprite
 	byte 4,1,94,114,8,0
-
-*4250 B=330
-	li r0,330
-	mov r0,@b
 	
 * pointless happy tune	
+*4250 B=330
 *4260 FOR A=1 TO 3
 *4270 CALL SOUND(300,B,0)
 *4280 CALL SOUND(300,B+55,0)
@@ -1090,10 +976,11 @@ l4230c
 *4350 CALL SOUND(300,B-110,0)
 	bl @playsound
 	data happysnd-firstsnd+>2500
+	bl @waitsound
 	
 *4360 FOR A=1 TO 300 :: NEXT A
-	li r0,7
 	bl @cdelay
+	data 30
 	
 *4370 DISPLAY AT(9,10):"BONUS= 100 X"
 	bl @display
@@ -1131,7 +1018,9 @@ l4390b
 	bl @showlives
 
 	inc @co
-	bl @waitsound
+	
+	bl @cdelay
+	data 20
 	
 	jmp l4390b
 l4400b
@@ -1140,7 +1029,7 @@ l4400b
 	mov r8,@a
 l4410b
 	mov @a,r0
-	ci r0,1000
+	ci r0,2000
 	jh l4420b
 	
 	bl *r6			* slow it down a bit, this is just a timeout delay
@@ -1519,18 +1408,20 @@ l11000
 	BL @VDPSETF
 	data >478c
 	byte 0,128
-	
-	li r0,6
-	clr r1
-	li r2,-5
-	bl *r9
+
+* these setups rely on side effects, that r0 etc are set by previous calls	
+	bl @fixmotion
+	byte 0,6,0,-5
+
 	li r0,10
 	bl *r9
-	li r0,7
-	li r2,5
-	bl *r9
+
+	bl @fixmotion
+	byte 0,7,0,5
+
 	inc r0
 	bl *r9
+
 	inc r0
 	bl *r9
 	
@@ -1560,21 +1451,25 @@ l12000
 	data >4784
 	byte 0,128
 
-	li r0,4
-	clr r1
-	li r2,5
-	bl *r9
+* these setups rely on side effects, that r0 etc are set by previous calls	
+	bl @fixmotion
+	byte 0,4,0,5
+	
 	li r0,8
 	bl *r9
+
 	inc r0
 	bl *r9
-	li r2,-5
-	li r0,5
-	bl *r9
+
+	bl @fixmotion
+	byte 0,5,0,-5
+
 	inc r0
 	bl *r9
+
 	inc r0
 	bl *r9
+
 	li r0,10
 	bl *r9
 	
@@ -1911,6 +1806,11 @@ POSITIONRAW
 	mov r2,@co
 	b *r10
 
+* Pattern for player 1 (loads R0)
+* this is called by R7
+PATTERN1
+	mov r8,r0
+
 * PATTERN 0 = SPRITE+1, 1=CHARACTER CODE
 PATTERN	MOV R11,R14
 		MOV R0,R12
@@ -2005,15 +1905,27 @@ sprdone
 		andi r0,>0000
 		B *R11
 
-* CDELAY - r0 number of times to call COINC
+* CDELAY - data = number of times to call COINC
 CDELAY
 		mov r11,r14
-		mov r0,r12
+		mov *r14+,12
 CDELAY1
 		bl *r6
 		dec r12
 		jne cdelay1
 		b *R14
+		
+* fixmotion - 0,sprite,rs,cs as data
+* fixmotion2 skips the 0 and the sprite
+fixmotion
+		inc r11
+		movb *r11+,r0
+		srl r0,8
+fixmotion2		
+		movb *r11+,r1
+		sra r1,8
+		movb *r11+,r2
+		sra r2,8
 
 * MOTION 0=sprite+1, 1=row speed, 2=column speed
 MOTION
@@ -2120,6 +2032,43 @@ waitsnd1
 		jne waitsnd1
 		
 		b *r10
+
+* animmove - animated move of the player sprite,
+* used for the final animation. data statement
+* after the call should include row add, column add,
+* base character (animated 1-4) and number of frames
+* getting hard to find free registers...
+animmove
+* load the variables
+		movb *r11+,r10		* row step
+		sra r10,8
+		movb *r11+,r13		* col step
+		sra r13,8
+		movb *r11+,r15		* base character
+		srl r15,8
+		movb *r11+,r3		* frames
+		srl r3,8
+
+* save return
+		mov r11,@save
+	
+* and away we go!
+animlp1
+		mov r8,r0
+		bl @position		* position lands in r1,r2
+		a r10,r1
+		a r13,r2
+		bl @locate			* update position
+		bl @animframe		* r1 = 1-4
+		a r15,r1
+		bl *r7				* update frame (pattern1)
+		bl *r6				* coinc and delay
 		
+		dec r3
+		jne animlp1
+		
+		mov @save,r11
+		B *r11
+			
 		END
 
