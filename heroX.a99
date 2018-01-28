@@ -1,6 +1,5 @@
-** music/better sfx?? Replace call sound with sound lists?
 ** The whole end sequence is messed up by the new speed
-** over 4k again (sound and end routine updates hopefully will fix)
+** over 4k again (end routine updates hopefully will fix?)
 ** add a bonus countdown timer per level?
 ** need last score on title page
 
@@ -19,7 +18,8 @@
 * 1000	101F	CT (reg 3, 00-ff, scale >0040, value 40)
 * 1020  1FFF    
 * 2000  24FF    SDT (reg 2, 0-F, scale >0400, value 08 (256 bytes extra padding))
-* 2500  3FFF	
+* 2500  25FF    sound lists
+* 2600  3FFF
 *
 * Register usage
 * R0 - Scratch, argument passing
@@ -49,40 +49,6 @@
 * C0 - DF - Interrupt workspace
 * E0 - FF - GPLWS
 
-* Subroutine calls
-* wradr			xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (r5)
-* coinc			xxxxxxxxxxxxxxxxxxxxxxxxx		 (r6)
-* pattern		xxxxxxxxxxxxxxxx				 (r7)
-* motion		xxxxxxxxxxxxxx					 (r9)
-* sound			xxxxxxxxxxxxxx (now all broken up)
-* position		xxxxxxxxxxxxx
-* vdpset		xxxxxxxxxxx
-* hcharf		xxxxxxxxxx
-* locate		xxxxxxxxx
-* gchar			xxxxxx
-* vcharf		xxxxx
-* vdpcpy		xxxxx
-* cdelay		xxxx
-* display		xxxx
-* pix2char  	xxxx
-* scan			xxxx
-* spriteadr		xxxx
-* hchar			xxx
-* key			xxx
-* char			xx
-* disnum		xx
-* DSPRALL		xx
-* hchar1		xx
-* hcharadr		xx
-* CLEAR			x
-* delspr		x
-* dispadr		x
-* sprite		x
-* waitnewkey	x
-* 000e			console ROM keyboard scan, can't inline
-* draw			complex enough to keep separate
-* shapes		complex enough to keep separate
-
 * Variables in RAM
 *
 	AORG >8320
@@ -101,7 +67,6 @@ cs  bss 2   * column speed (used for jumping)
 ij  bss 2   * is jumping (wasteful, but we can afford it)
 
 * SHARED VARIABLES
-SNDDEL	BSS 2			* SOUND COUNTDOWN DELAY IN FRAMES
 ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
 
 * Cartridge Header (if cart, not used for MM)
@@ -144,7 +109,10 @@ HELPHELP
 FFBYTE
 		BYTE >FF
 		EVEN
-		
+
+* tried bit reversal to calculate mirrored patterns, but it only
+* saved 4 bytes -- the data to support it was then larger than
+* the raw patterns themselves.
 CHARDAT1
 		data >0000,>023E,>FB39,>0000	*  96	bird right
 		data >0000,>3AFE,>3B11,>0000	*  97
@@ -202,6 +170,80 @@ CHARDAT3
 		data >0000,>0000,>0018,>2424	* 148
 		data >0000,>0000,>0000,>1866	* 149
 		data >0000,>0000,>0000,>007e	* 150
+		
+* sound lists
+firstsnd
+jumpsnd
+		data >02e2,>f704,>01ff,>0000
+		
+wafersnd
+		data >038b,>0C90,>0601,>9F00
+		
+fallsound
+		data >0380,>0790,>0102,>8f07
+		data >0102,>8109,>0102,>8f0a
+		data >0102,>8b0c,>0102,>8e0f
+		data >0102,>8215,>0102,>8c1f
+		data >0102,>883f,>0101,>9f00
+		
+gameoversnd
+		byte 6,>90,>b0
+		byte 136,3,140,1,1
+		byte 4,140,3,141,1,1
+		byte 4,143,3,143,1,1
+		byte 4,131,4,129,2,1
+		byte 4,136,4,132,2,1
+		byte 4,142,4,134,2,1
+		byte 4,132,5,138,2,1
+		byte 4,140,5,141,2,1
+		byte 4,133,6,130,3,1
+		byte 4,128,7,135,3,1
+		byte 4,142,7,142,3,1
+		byte 4,143,8,134,4,1
+		byte 4,135,10,130,5,1
+		byte 4,136,12,129,6,1
+		byte 4,137,15,136,7,1
+		byte 4,137,20,141,9,1
+		byte 4,134,30,131,14,1
+		byte 4,132,58,139,25,1
+		byte 2,>9f,>bf,0
+		
+gamewin
+		byte 3,>90
+		byte 139,12,1
+		byte 2,137,10,1
+		byte 2,129,9,1
+		byte 2,143,7,1
+		byte 2,129,7,1
+		byte 1,>9f,0
+
+punchsnd
+		data >02e5,>f406,>01ff,>0000
+		
+happysnd
+		byte 3,>90
+		byte 131,21,18
+		byte 2,131,18,18
+		byte 2,128,20,18
+		byte 2,132,17,18
+		byte 2,142,15,18
+		byte 2,130,14,18
+		byte 2,131,15,18
+		byte 2,137,13,18
+		byte 2,139,12,18
+		byte 2,137,11,18
+		byte 2,132,12,18
+		byte 2,131,11,18
+		byte 2,129,9,18
+		byte 2,133,10,18
+		byte 2,139,12,18	
+		byte 1,>9f,0
+
+tallysnd
+		data >038f,>1190,>0201,>9f00
+
+* label for the end of sound data
+endsound
 			
 GOGAME	
 		LIMI 0				* disable interrupts
@@ -242,8 +284,9 @@ INITL1
 		BL @VDPSETF
 		data >5000
 		byte >10,32
-* AND CLEAR ANY SOUND DELAY COUNTER
-		CLR @SNDDEL
+* copy over the sound lists
+		bl @vdpcpy
+		data >6500,firstsnd,endsound-firstsnd
 
 *1 CALL SCREEN(15)		* in the VDP init
 
@@ -552,8 +595,8 @@ l310b
 	bl @pattern
 	
 *330 CALL SOUND(100,-3,15)
-	bl @soundvol
-	byte -3,7
+	bl @playsound
+	data jumpsnd-firstsnd+>2500
 
 * check for wafer (thus +2, not +3)
 *400 CALL POSITION(#1,RO,CO) :: RO=RO/8+2 :: CO=CO/8+1
@@ -576,8 +619,8 @@ l400
 	li r2,32
 	bl @hchar1
 	
-	bl @sound100
-	data 550
+	bl @playsound
+	data wafersnd-firstsnd+>2500
 	
 	dec @nw			* count collected wafers
 	
@@ -691,21 +734,9 @@ l2005c
 
 * I like it the way it is, sound effect, then fall. Lets you see what killed you.
 *2010 FOR A=990 TO 110 STEP-110 :: CALL SOUND(-100,A,0) :: NEXT A
-	li r0,990
-	mov r0,@a
-l2010b
-	mov @a,r0
-	ci r0,110
-	jl l2010c
-	
-	mov @a,r1
-	bl @soundn100
-	bl *r6		* delay
-	
-	li r0,-110
-	a r0,@a
-	jmp l2010b
-l2010c
+	bl @playsound
+	data fallsound-firstsnd+>2500
+	bl @waitsound		* this is one place I'd like to pause
 
 * falling here
 *2020 CALL PATTERN(#1,106) :: CALL MOTION(#1,16,0)
@@ -746,22 +777,9 @@ l2030
 * game over!	
 *3000 FOR A=1990 TO 110 STEP-110 :: CALL SOUND(-100,A,0,A*2,0) :: NEXT A
 l3000
-	li r0,1990
-	mov r0,@a
-l3000b
-	mov @a,r0
-	ci r0,110
-	jl l3000c
-	
-	mov @a,r1
-* voice 2 not supported yet
-	bl @soundn100
-	bl *r6			* delay
-	
-	li r0,-110
-	a r0,@a
-	jmp l3000b
-l3000c
+	bl @playsound
+	data gameoversnd-firstsnd+>2500
+	bl @waitsound
 
 *3010 DISPLAY AT(12,8):"GAME OVER"
 	bl @display
@@ -794,21 +812,9 @@ l3040b
 * play a little win chime	
 *4000 FOR A=550 TO 1010 STEP 110 :: CALL SOUND(-100,A,0) :: NEXT A
 l4000
-	li r0,550
-	mov r0,@a
-l4000b
-	mov @a,r0
-	ci r0,1010
-	jh l4000c
-	
-	mov @a,r1
-	bl @soundn100
-	bl *r6		* delay
-	
-	li r0,110
-	a r0,@a
-	jmp l4000b
-l4000c
+	bl @playsound
+	data gamewin-firstsnd+>2500
+	bl @waitsound
 
 * back down the ladder
 *4010 FOR A=1 TO 4 :: CALL POSITION(#1,RO,CO) :: CALL LOCATE(#1,RO+8,CO) :: FOR B=1 TO 40 :: NEXT B :: NEXT A
@@ -873,9 +879,8 @@ l4020c
 	li r1,144
 	bl *r7
 	
-	bl @soundvol
-	byte -6,5
-	bl *r6			* delay
+	bl @playsound
+	data punchsnd-firstsnd+>2500
 
 * drop villian
 *4050 CALL PATTERN(#2,110) :: CALL MOTION(#2,18,0)
@@ -960,9 +965,8 @@ l4070
 	bl *r7
 	
 *4160 CALL SOUND(100,-6,4)
-	bl @soundvol
-	byte -6,2
-	bl *r6
+	bl @playsound
+	data punchsnd-firstsnd+>2500
 	
 * break machine and unpunch	
 *4170 CALL HCHAR(6,3,121) :: CALL PATTERN(#1,98)
@@ -1075,49 +1079,17 @@ l4230c
 	
 * pointless happy tune	
 *4260 FOR A=1 TO 3
-	mov r8,@a
-l4260b
-	mov @a,r0
-	ci r0,3
-	jh l4320b
-
 *4270 CALL SOUND(300,B,0)
-	mov @b,r1
-	bl @sound300
-	
 *4280 CALL SOUND(300,B+55,0)
-	ai r1,55
-	bl @sound300
-
 *4290 CALL SOUND(300,B+20,0)
-	ai r1,-35
-	bl @sound300
-	
 *4300 CALL SOUND(300,B+75,0)
-	ai r1,55
-	bl @sound300
-	
 *4310 B=B+110
-	li r0,110
-	a r0,@b
-	
 *4320 NEXT A
-	inc @a
-	jmp l4260b
-l4320b
-
 *4330 CALL SOUND(300,B+110,0)
-	mov @b,r1
-	ai r1,110
-	bl @sound300
-	
 *4340 CALL SOUND(300,B,0)
-	ai r1,-110
-	bl @sound300
-	
 *4350 CALL SOUND(300,B-110,0)
-	ai r1,-110
-	bl @sound300
+	bl @playsound
+	data happysnd-firstsnd+>2500
 	
 *4360 FOR A=1 TO 300 :: NEXT A
 	li r0,7
@@ -1137,8 +1109,8 @@ l4390b
 	mov @nm,r0
 	jeq l4400b
 	
-	bl @sound100
-	data 1000
+	bl @playsound
+	data tallysnd-firstsnd+>2500
 	
 	li r0,9
 	mov @co,r1
@@ -1159,6 +1131,7 @@ l4390b
 	bl @showlives
 
 	inc @co
+	bl @waitsound
 	
 	jmp l4390b
 l4400b
@@ -1721,18 +1694,20 @@ DNUMLP
 * Data statements after the call
 CHAR	MOV R11,R14
 		movb *r14+,R12
+
 		SRL R12,8
 		SLA R12,3
 		AI R12,>4800
-CHAR1	bl @wradrf
+		bl @wradrf	* this handles the return
+
 		movb *r14+,R13
 		SRL R13,8
 		mov *r14+,r12
 CHAR2
-    MOVB *R12+,*r4  *inline vdpcpy since vdpcpy isn't embeddable now
-    DEC R13
-    JNE CHAR2
-    B *R14
+		MOVB *R12+,*r4  *inline vdpcpy since vdpcpy isn't embeddable now
+		DEC R13
+		JNE CHAR2
+		B *R14
 		
 * VDP Copy - follow with VDP adr, CPU addr, byte count (word)
 VDPCPY
@@ -1936,85 +1911,6 @@ POSITIONRAW
 	mov r2,@co
 	b *r10
 
-* duration 100, volume 0, pass tone as data words
-sound100
-  li r0,6
-  MOV *R11+,R1
-  jmp sv0
-
-* set freq and vol and come here (len 100) as data bytes
-soundvol
-  li r0,6
-  movb *r11+,r1
-  sra r1,8
-  movb *r11+,r2
-  srl r2,8
-  jmp sound
-
-* negative 100 duration, zero vol, load r1 for tone
-soundn100
-  li r0,-6
-  jmp sv0
-
-* 300 duration, zero vol, load r1 for tone
-sound300
-  li r0,18
-  jmp sv0
-
-sv0
-  clr r2
-  
-* SOUND  0 - DURATION (INCL. NEGATIVE), 1 - PITCH (INCL. NEGATIVE), 2 - VOLUME
-* Duration is in frames, volume is 0-15. Pitch remains in HZ
-* note: only one voice at a time, and tone or noise only
-* Note2: Duration calculation was wrong in TI MOTIF
-SOUND	mov r11,r10			* save return for delay
-		MOV R0,R13
-		JLT ISNEG			* NEGATIVE?
-		JMP SOUND1			* IF NO, GO WAIT
-ISNEG
-		NEG R13				* MAKE POSITIVE
-		JMP SOUND3			* AND GO PLAY IT
-SOUND1	
-		MOV @SNDDEL,R12
-		JEQ SOUND3
-		bl *r6			    * delay, sprites, etc
-		JMP SOUND1
-SOUND3	
-		MOV R13,@SNDDEL
-		MOV R1,R14
-		JLT SOUND4			* NEGATIVE, PLAY NOISE
-		LI R12,>0001		* POSITIVE, PLAY TONE
-		LI R13,>B4F5		* 111861
-		DIV R14,R12
-		MOV R12,R13
-		ANDI R12,>000F
-		ORI R12,>0080
-		SWPB R12
-		MOVB R12,@>8400
-		SRL R13,4
-		SWPB R13
-		MOVB R13,@>8400
-		MOV R2,R12
-		ORI R12,>0090
-		SWPB R12
-		MOVB R12,@>8400
-		LI R12,>FF00
-		MOVB R12,@>8400
-		JMP SOUND5
-SOUND4	INV R14
-*		ANDI R14,>000F
-		ORI R14,>00E0
-		SWPB R14
-		MOVB R14,@>8400		* PLAY NOISE
-		MOV R2,R12
-		ORI R12,>00F0
-		SWPB R12
-		MOVB R12,@>8400
-		LI R12,>9F00
-		MOVB R12,@>8400
-SOUND5	B *R10	
-
 * PATTERN 0 = SPRITE+1, 1=CHARACTER CODE
 PATTERN	MOV R11,R14
 		MOV R0,R12
@@ -2036,18 +1932,6 @@ INTWAIT
 		limi 0
 		mov @>83d6,r0
 		jeq intwait
-		
-* handle sound timeout
-		mov @snddel,r0
-		jeq intw2
-		
-		dec @snddel
-		jgt intw2
-        LI R0,>9FFF		* mute all sound (we only use 2 channels)
-		MOVB R0,@>8400
-		SWPB R0
-		MOVB R0,@>8400
-intw2
 
 * inline anim - uses temp workspace!
 * sprite enemy animation. we can skip #1 (player) and #2 (boss)
@@ -2218,8 +2102,24 @@ showlives
 		li r2,136
 		mov @nm,r3
 		b @hchar		* hchar handles the return for us
+
+* start a sound list on the ISR
+* pass the VDP address in the data statement
+playsound
+		mov *r11+,@>83cc	* set pointer to VDP sound list
+		socb @>8311,@>83fd	* set the 'vdp' source flag bit (R8 LSB)
+		movb @>8311,@>83ce	* start sound processing
+		b *r11
 		
+* wait for any active playlist to finish
+waitsound
+		mov r11,r10
+waitsnd1
+		bl *r6
+		movb @>83ce,r0
+		jne waitsnd1
 		
+		b *r10
 		
 		END
 
