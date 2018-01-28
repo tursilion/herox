@@ -1,5 +1,3 @@
-** add a bonus countdown timer per level?
-
 ************************
 * HeroX - by Tursi     *
 * Ported by Tursi      *
@@ -23,12 +21,12 @@
 * R1 - Scratch, argument passing
 * R2 - Scratch, argument passing
 * R3 - Scratch, argument passing
-* R4 - >8c00 (vdp write data)
-* R5 - wradr function address
-* R6 - coinc function address
-* R7 - pattern function address
-* R8 - Always 1 - don't change it (optimization)
-* R9 - motion function address
+* R4 - >8c00 (vdp write data)		26 hits
+* R5 - hcharf function address		12 hits
+* R6 - coinc function address		12 hits
+* R7 - pattern function address		12 hits
+* R8 - Always 1 - don't change it (optimization) (18 hits)
+* R9 - motion function address		 8 hits
 * R10- Subroutine scratch
 * R11- Return address for BL, subroutine usage
 * R12- Subroutine scratch
@@ -42,9 +40,29 @@
 * 4A - 6D - stack area - probably free
 * 6E - 6F - free outside of floating point
 * 70 - 7F - GPL status block
-* 80 - BF - GPL Stack - free
+* 80 - BF - GPL Stack - used as second workspace during COINC work
 * C0 - DF - Interrupt workspace
 * E0 - FF - GPLWS
+
+* hcharf 	- 12 hits
+* cdelay 	- 10 hits
+
+* animmove 	- 7 hits
+* vcharf 	- 7 hits
+* display 	- 6 hits
+* position 	- 6 hits
+* animframe - 5 hits
+* disnum 	- 5 hits
+* spriteadr - 5 hits
+* wradrf	- 5 hits
+* gchar 	- 4 hits
+* waitsound - 4 hits
+
+
+
+
+
+
 
 * Variables in RAM
 *
@@ -85,10 +103,12 @@ PROG1	DATA >0000,GOGAME,>0548
 
 HEROX	TEXT 'HERO'
 		BYTE >80
+NOISESND
+		BYTE >E5
 		EVEN
 		
 PRESSFIRE
-		TEXT 'PRESS FIRE BUTTON TO PLAY.'
+		TEXT 'PRESS FIRE BUTTON TO PLAY'
 		BYTE >80
 		EVEN
 		
@@ -113,6 +133,10 @@ HELPHELP
 FFBYTE
 		BYTE >FF
 		EVEN
+		
+* contains noise channel volume for the footstep frames
+runsnd
+		data >f8ff,>ffff
 
 * tried bit reversal to calculate mirrored patterns, but it only
 * saved 4 bytes -- the data to support it was then larger than
@@ -178,7 +202,18 @@ CHARDAT3
 * sound lists
 firstsnd
 jumpsnd
-		data >02e2,>f704,>01ff,>0000
+* jump sound was from mario bros (39 bytes)
+* delays would normally be 1, but I skipped every other frame
+* to reduce the memory usage
+		byte 3,>86,>2A,>93,2
+		byte 2,>8A,>20,2
+		byte 2,>82,>19,2
+		byte 2,>84,>13,2
+		byte 2,>8C,>0E,2
+		byte 3,>85,>0B,>95,2
+		byte 3,>8A,>08,>99,2
+		byte 3,>88,>06,>9C,2
+		byte 1,>9F,0
 		
 wafersnd
 		data >038b,>0C90,>0601,>9F00
@@ -192,25 +227,26 @@ fallsound
 		
 gameoversnd
 		byte 6,>90,>b0
-		byte 136,3,140,1,1
-		byte 4,140,3,141,1,1
-		byte 4,143,3,143,1,1
-		byte 4,131,4,129,2,1
-		byte 4,136,4,132,2,1
-		byte 4,142,4,134,2,1
-		byte 4,132,5,138,2,1
-		byte 4,140,5,141,2,1
-		byte 4,133,6,130,3,1
-		byte 4,128,7,135,3,1
-		byte 4,142,7,142,3,1
-		byte 4,143,8,134,4,1
-		byte 4,135,10,130,5,1
-		byte 4,136,12,129,6,1
-		byte 4,137,15,136,7,1
-		byte 4,137,20,141,9,1
-		byte 4,134,30,131,14,1
-		byte 4,132,58,139,25,1
-		byte 2,>9f,>bf,0
+		byte 136,3,140,1,2
+		byte 4,140,3,141,1,2
+		byte 4,143,3,143,1,2
+		byte 4,131,4,129,2,2
+		byte 4,136,4,132,2,2
+		byte 4,142,4,134,2,2
+		byte 4,132,5,138,2,2
+		byte 4,140,5,141,2,2
+		byte 4,133,6,130,3,2
+		byte 4,128,7,135,3,2
+		byte 4,142,7,142,3,2
+		byte 4,143,8,134,4,2
+		byte 4,135,10,130,5,2
+		byte 4,136,12,129,6,2
+		byte 4,137,15,136,7,2
+		byte 4,137,20,141,9,2
+		byte 4,134,30,131,14,2
+		byte 4,132,58,139,25,2
+		byte 2,>9f,>bf,60
+		byte 1,>9f,0
 		
 gamewin
 		byte 3,>90
@@ -254,7 +290,7 @@ GOGAME
 		LWPI >8300			* set correct workspace
 		LI R8,1				* we reserve R8 to always be the value '1' to save some memory
 		li r4,>8C00			* VDPWD
-		LI R5,wradr1		* R5 for wradr
+		LI R5,hcharf		* R5 for hcharf
 		LI R6,coinc			* r6 for coinc
 		LI R7,pattern1		* r7 for pattern1 (pattern for player1)
 		li r9,motion		* r9 for motion
@@ -322,6 +358,10 @@ INITL1
 *20 CALL CLEAR
 l20
 		BL @CLEAR
+		
+* run sound init
+		movb @ffbyte,@>8400	* no run sound
+		movb @NOISESND,@>8400 * pfft sound
 
 *25 CALL DELSPRITE(ALL)
 *		BL @DSPRALL		* done in clear
@@ -332,7 +372,7 @@ l20
 *40 CALL HCHAR(11,14,105,6)
 *50 CALL HCHAR(13,14,105,6)
 
-		bl @hcharf
+		bl *r5
 		byte 11,14,105,6
 		byte 13,14,105,6
 		byte 0,0
@@ -377,7 +417,7 @@ l100
 l150
 *	BL @DSPRALL  * done in clear
 
-*155 AS=0 * no longer used - bl @animframe instead
+*155 AS=0 * no longer used - bl animframe instead
 
 *157 NW=4
 	li r0,4
@@ -423,7 +463,7 @@ l190
 
 *200 CALL COLOR(#1,2)
 * Inline SPcolor
-	bl *r5
+	bl @wradr
 	data >4303
 	MOVB @>8311,*r4    * R8 LSB for color 1
 
@@ -434,11 +474,14 @@ l210
 	jeq bonusok			* if bonus is zero, then ignore it
 	
 	dec @bonus
-	joc bonusok
+	jne bonusok
 	b @l2000			* die if bonus expired
 bonusok
 	bl @disbonus
-
+	
+* run sound off by default	
+	movb @ffbyte,@>8400
+	
 * new movement code
 	mov @ij,r0
 	jeq l210b
@@ -553,16 +596,15 @@ l260b
 	bl @position
 
 	s @rs,r1
-*	s @rs,r1
 	
-*	jne l270b  * i think this is just an XB limit workaround - 0 is illegal there
+*	jne l270b  * this was just an XB limit workaround - 0 is illegal there
 *	inc r1
 *l270b
 	
 	mov r1,@ro
 	bl @snapcol		* this will call locate
 	
-	jmp l300		  * don't allow x movement
+	jmp l300		* don't allow x movement
 
 *214 if X=0 then 300
 l214
@@ -593,7 +635,8 @@ l225
 * 0 = 129 or 134 (maybe just 129 for convenience)
 * animframe needs to return 1-4
 	bl @animframe
-	ai r1,132		
+	movb @runsnd-1(r1),@>8400
+	ai r1,132
 *	mov @x,r0	* @X is still in r3
     mov r3,r3
     jlt l228b
@@ -748,7 +791,7 @@ l1000b
 	ci r12,>62e6
 	jne l1000b
 	
-	bl @hcharf
+	bl *r5
 	byte 24,8,32,5,0,0
 	
 	a @bonus,@sc
@@ -770,6 +813,8 @@ l1015b
 	
 *2000 REM  DIED!
 l2000
+* show the bonus in case it reached 0
+	bl @disbonus
 
 *2005 FOR A=4 TO 16 :: CALL MOTION(#A,0,0) :: NEXT A
 	li r0,4
@@ -806,7 +851,7 @@ l2030
 	bl @dsprall
 	
 *2045 CALL HCHAR(23,4,32,5)
-	bl @hcharf
+	bl *r5
 	byte 23,4,32,5,0,0
 
 *2050 NM=NM-1 :: CALL HCHAR(23,4,97,NM)
@@ -822,38 +867,21 @@ l2030
 	b @l170
 	
 * game over!	
-*3000 FOR A=1990 TO 110 STEP-110 :: CALL SOUND(-100,A,0,A*2,0) :: NEXT A
 l3000
-	bl @playsound
-	data gameoversnd-firstsnd+>2500
-	bl @waitsound
-
 *3010 DISPLAY AT(12,8):"GAME OVER"
 	bl @display
 	byte 12,10
 	data gameover
+
+*3000 FOR A=1990 TO 110 STEP-110 :: CALL SOUND(-100,A,0,A*2,0) :: NEXT A
+	bl @playsound
+	data gameoversnd-firstsnd+>2500
+	bl @waitsound
 	
 *3020 FOR A=1 TO 50 :: CALL KEY(C,K,S)
-	mov r8,@a
-l3020b
-	mov @a,r0
-	ci r0,100
-	jh l3040b
-
-	bl *r6		* slow it down a bit, this is just a timeout delay
-	bl @scan
-	bl @key
-*	ci r1,18    * done in key
-	
 *3030 IF K=18 THEN 20
-	jne l3040
-	b @l20
-	
 *3040 NEXT A :: GOTO 20
-l3040
-	inc @a
-	jmp l3020b
-l3040b
+* loop replaced by playing the sound to save space
 	b @l20
 	
 * play a little win chime	
@@ -943,13 +971,13 @@ l4070
 	
 * display '?'	
 *4120 CALL HCHAR(4,5,63) :: FOR A=1 TO 300 :: NEXT A :: CALL HCHAR(4,5,32)
-	bl @hcharf
+	bl *r5
 	byte 4,5,63,1,0,0
 	
 	bl @cdelay
 	data 10
 	
-	bl @hcharf
+	bl *r5
 	byte 4,5,32,1,0,0
 	
 	bl *r6
@@ -976,7 +1004,7 @@ l4070
 *4170 CALL HCHAR(6,3,121) :: CALL PATTERN(#1,98)
 * erase 'help' too
 *4175 DISPLAY AT(1,10):"    ";
-	bl @hcharf
+	bl *r5
 	byte 6,3,146,1
 	byte 1,12,32,4,0,0
 	
@@ -1072,7 +1100,7 @@ l4390b
 	bl @disnum
 	
 *4400 CALL HCHAR(23,4,32,5) :: NM=NM-1 :: CALL HCHAR(23,4,97,NM) :: CO=CO+1 :: NEXT A
-	bl @hcharf
+	bl *r5
 	byte 23,4,32,5,0,0
 	
 	dec @nm
@@ -1141,7 +1169,7 @@ JTABLE
 *10260 CALL HCHAR(14,3,112)
 *10270 CALL HCHAR(21,30,112)
 l10160
-	bl @hcharf
+	bl *r5
 	byte 5,1,105,32
 	byte 10,1,105,32
 	byte 15,1,105,32
@@ -1174,7 +1202,7 @@ l10160
 *10370 CALL HCHAR(14,27,112)
 *10380 CALL HCHAR(21,27,112)
 l10300
-	bl @hcharf
+	bl *r5
 	byte 5,1,105,32
 	byte 10,1,105,32
 	byte 15,1,105,32
@@ -1205,7 +1233,7 @@ l10300
 *10455 CALL HCHAR(16,30,112)
 *10460 CALL HCHAR(20,14,112)
 l10400
-	bl @hcharf
+	bl *r5
 	byte 5,1,105,32
 	byte 10,1,105,32
 	byte 17,1,105,32
@@ -1247,7 +1275,7 @@ l10400
 *10585 CALL HCHAR(3,23,112)
 *10590 CALL HCHAR(3,29,112)
 l10500
-	bl @hcharf
+	bl *r5
 	byte 4,7,105,12
 	byte 4,21,105,4
 	byte 4,27,105,4
@@ -1288,7 +1316,7 @@ l10500
 *10615 CALL HCHAR(17,3,105,28)
 *10620 CALL HCHAR(22,3,105,28)
 l10600
-	bl @hcharf
+	bl *r5
 	byte 3,9,105,12
 	byte 7,3,105,28
 	byte 12,3,105,28
@@ -1368,10 +1396,10 @@ l10720b
 	b *r10
 
 SDAT1
-	BYTE 15,80,101,4,15,160,101,4,15,240,101,4
-	byte 55,80,101,4,55,160,101,4,55,240,101,4
-	byte 95,80,101,4,95,160,101,4,95,240,101,4	
-	byte 151,80,101,4,151,160,101,4,151,240,101,4
+	BYTE 15,80,147,4,15,160,147,4,15,240,147,4
+	byte 55,80,147,4,55,160,147,4,55,240,147,4
+	byte 95,80,147,4,95,160,147,4,95,240,147,4	
+	byte 151,80,147,4,151,160,147,4,151,240,147,4
 
 ** Level 2 **
 *10800 FOR A=1 TO 2 :: CALL SPRITE(#A+3,101,5,16,A*100,0,5) :: NEXT A
@@ -1410,10 +1438,10 @@ l10800b
 	b *r10
 
 SDAT2
-	byte 15,100,101,4,15,200,101,4
-	byte 55,100,101,4,55,200,101,4
-	byte 95,100,101,4,95,200,101,4
-	byte 151,100,101,4,151,200,101,4
+	byte 15,100,147,4,15,200,147,4
+	byte 55,100,147,4,55,200,147,4
+	byte 95,100,147,4,95,200,147,4
+	byte 151,100,147,4,151,200,147,4
 
 ** Level 3 **
 *10900 FOR A=1 TO 3 :: CALL SPRITE(#A+3,101,5,8,A*80,0,5) :: NEXT A
@@ -1451,9 +1479,9 @@ l10900b
 	b *r10
 
 SDAT3
-	byte 15,80,101,4,15,160,101,4,15,240,101,4
-	byte 55,80,101,4,55,160,101,4,55,240,101,4
-	byte 111,80,101,4,111,160,101,4,111,240,101,4
+	byte 15,80,147,4,15,160,147,4,15,240,147,4
+	byte 55,80,147,4,55,160,147,4,55,240,147,4
+	byte 111,80,147,4,111,160,147,4,111,240,147,4
 	byte 135,100,100,3
 
 ** Level 4 **
@@ -1491,7 +1519,7 @@ l11000
 
 SDAT4
 	byte 7,100,147,13,>d2,0,0,0,31,100,100,3
-	byte 55,80,101,4,55,160,101,4,55,240,101,4
+	byte 55,80,147,4,55,160,147,4,55,240,147,4
 	byte 87,80,100,3
 
 ** Level 5 **
@@ -1563,7 +1591,7 @@ SDAT5
 VDPTAB  DATA >E108,>4001,>0601,>0E00
 
 * Write address - address is data after the fact
-WRADR1
+WRADR
 		MOV *r11+,r12
     
 * write address - R12 has word ready to write with tags
@@ -1595,7 +1623,7 @@ VDPSET	MOVB R12,*r4
 
 CLEAR	mov r11,r10
 		bl @dsprall
-		bl *r5
+		bl @wradr
 		data >6000
 		LI R12,>2000
 		LI R13,>500   * 512 bytes padding for jump wraparound
@@ -1636,7 +1664,7 @@ disraw
 * DISBONUS - @bonus at 24,24
 disbonus
 		mov r11,r14
-		bl *r5
+		bl @wradr
 		data >62fa		* 24,26
 		mov @bonus,r13
 		jmp disnum2
@@ -1644,7 +1672,7 @@ disbonus
 *DISNUM	@SC, at 24,1 (XB offsets) (28 col print)
 *DISNUM2 - set address yourself, load value into R13
 DISNUM	MOV R11,R14
-		BL *r5
+		BL @wradr
 		data >62e2      * 24,3
 		MOV @SC,R13		* dividend
 DISNUM2		
@@ -1978,9 +2006,9 @@ sprdone
 * this is the actual coinc now
 		movb @>837b,r0
 * todo: dynamic cheat?		
-*		andi r0,>2000
+		andi r0,>2000
 * THIS LINE IS CHEATING
-		andi r0,>0000
+*		andi r0,>0000
 		B *R11
 
 * CDELAY - data = number of times to call COINC
