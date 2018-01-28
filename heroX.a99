@@ -1,5 +1,4 @@
 ** add a bonus countdown timer per level?
-** need last score on title page
 
 ************************
 * HeroX - by Tursi     *
@@ -15,9 +14,9 @@
 * 0800	0FFF	PDT (reg 4, 0-7, scale >0800, value 01) & SPT (reg 6, 0-7, scale >0800, value 01)
 * 1000	101F	CT (reg 3, 00-ff, scale >0040, value 40)
 * 1020  1FFF    
-* 2000  24FF    SDT (reg 2, 0-F, scale >0400, value 08 (256 bytes extra padding))
-* 2500  25FF    sound lists
-* 2600  3FFF
+* 2000  24FF    SIT (reg 2, 0-F, scale >0400, value 08 (256 bytes extra padding, thus not 768 bytes))
+* 2500  26FF    sound lists
+* 2700  3FFF
 *
 * Register usage
 * R0 - Scratch, argument passing
@@ -64,6 +63,7 @@ rs  bss 2	* row speed (used for jumping)
 cs  bss 2   * column speed (used for jumping)
 ij  bss 2   * is jumping (wasteful, but we can afford it)
 save bss 2	* extra return address
+bonus bss 2	* bonus timer
 
 * SHARED VARIABLES
 ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
@@ -97,8 +97,13 @@ GAMEOVER
 		BYTE >80
 		EVEN
 
-BONUS
+BONUSTXT
 		TEXT 'BONUS= 100 X'
+		BYTE >80
+		EVEN
+		
+JUSTBONUS
+		TEXT 'BONUS'
 		BYTE >80
 		EVEN
 		
@@ -253,6 +258,7 @@ GOGAME
 		LI R6,coinc			* r6 for coinc
 		LI R7,pattern1		* r7 for pattern1 (pattern for player1)
 		li r9,motion		* r9 for motion
+		clr @sc
 
 * inline initvdp
 * Set GR0 mode similar to XB
@@ -344,9 +350,15 @@ l20
 		byte 12,13
 		data herox
 
+* score on title page
+		mov @sc,r0
+		jeq l90
+		bl @disnum
+
 *90 DISPLAY AT(23,1):"PRESS FIRE BUTTON TO PLAY."
+l90
 		bl @display
-		byte 23,1
+		byte 22,1
 		data pressfire
 
 *100 CALL KEY(1,K,S)
@@ -380,6 +392,13 @@ l150
 *165 DISPLAY AT(24,1):SC
 	bl @disnum
 
+* init the bonus (this is skipped if you die)
+	li r0,1800		* 30s per level
+	li r1,6			* subtract level
+	s @le,r1
+	mpy r1,r0		* r1 now has the value we care about (32-bit result)
+	mov r1,@bonus
+
 *170 CALL SHAPES(LE) - this is the only call
 l170
 	bl @shapes
@@ -391,6 +410,11 @@ l170
 	clr @rs
 	clr @cs
 	clr @ij
+	
+	bl @display
+	byte 23,25
+	data justbonus
+	bl @disbonus
 
 *190 CALL KEY(C,K,S) :: IF K<>18 THEN 190 - ignoring c
 * note: jump/move is really different now
@@ -405,6 +429,16 @@ l190
 
 *210 CALL JOYST(C,X,Y)
 l210
+* count down the bonus - die if it wraps
+	mov @bonus,r0
+	jeq bonusok			* if bonus is zero, then ignore it
+	
+	dec @bonus
+	joc bonusok
+	b @l2000			* die if bonus expired
+bonusok
+	bl @disbonus
+
 * new movement code
 	mov @ij,r0
 	jeq l210b
@@ -694,7 +728,34 @@ l460b
 *1000 REM  NEXT LEVEL
 l1000
 
+* tally up bonus
+	mov @bonus,r0
+	jeq l1010
+
+	li r12,>62f9
+l1000b	
+	bl @wradrf
+	mov r12,@save
+	mov @bonus,r13
+	bl @disraw
+	li r0,>2000
+	movb r0,@>8C00
+	
+	bl *r6
+
+	mov @save,r12
+	dec r12
+	ci r12,>62e6
+	jne l1000b
+	
+	bl @hcharf
+	byte 24,8,32,5,0,0
+	
+	a @bonus,@sc
+	bl @disnum
+
 *1010 LE=LE+1
+l1010
 	inc @le
 	
 *1015 IF LE=6 THEN 4000
@@ -757,6 +818,7 @@ l2030
 	jeq l3000
 
 *2070 GOTO 170
+	clr @bonus
 	b @l170
 	
 * game over!	
@@ -985,7 +1047,7 @@ l4180b
 *4370 DISPLAY AT(9,10):"BONUS= 100 X"
 	bl @display
 	byte 9,10
-	data bonus
+	data bonustxt
 
 *4380 CO=25
 	li r0,25
@@ -1565,11 +1627,27 @@ DSLP1	MOVB *R12+,R13
 		JMP DSLP1
 DSEXIT	B *R14
 
+* disraw - entry at DISNUM2 without other setting
+* used in the bonus tally
+disraw
+		mov r11,r14
+		jmp disnum2
+
+* DISBONUS - @bonus at 24,24
+disbonus
+		mov r11,r14
+		bl *r5
+		data >62fa		* 24,26
+		mov @bonus,r13
+		jmp disnum2
+
 *DISNUM	@SC, at 24,1 (XB offsets) (28 col print)
+*DISNUM2 - set address yourself, load value into R13
 DISNUM	MOV R11,R14
 		BL *r5
-		data >62e2    * 24,3
+		data >62e2      * 24,3
 		MOV @SC,R13		* dividend
+DISNUM2		
 		LI R11,10000	* divisor
 DNUMLP	
 		CLR R12			* prepare for DIV
