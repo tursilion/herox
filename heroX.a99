@@ -44,9 +44,7 @@
 * C0 - DF - Interrupt workspace
 * E0 - FF - GPLWS
 
-* hcharf 	- 12 hits
 * cdelay 	- 10 hits
-
 * animmove 	- 7 hits
 * vcharf 	- 7 hits
 * display 	- 6 hits
@@ -57,12 +55,6 @@
 * wradrf	- 5 hits
 * gchar 	- 4 hits
 * waitsound - 4 hits
-
-
-
-
-
-
 
 * Variables in RAM
 *
@@ -88,12 +80,7 @@ ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
 
 * Cartridge Header (if cart, not used for MM)
 		AORG >6000
-
-* PROGRAMS ARE LISTED IN REVERSE ORDER
-		
 		DATA >AA01,>0200,>0000,PROG1,>0000,>0000
-PROG1	DATA >0000,GOGAME,>0548
-		TEXT 'EROX'
 		EVEN
 
 * start in MiniMem RAM range
@@ -101,10 +88,10 @@ PROG1	DATA >0000,GOGAME,>0548
 * todo: enable when it fits in 4k ;)
 *		AORG >7000
 
-HEROX	TEXT 'HERO'
+PROG1	DATA >0000,GOGAME
+		BYTE >05
+HEROX	BYTE >48,>45,>52,>4F,>58		* 'HEROX'
 		BYTE >80
-NOISESND
-		BYTE >E5
 		EVEN
 		
 PRESSFIRE
@@ -118,8 +105,10 @@ GAMEOVER
 		EVEN
 
 BONUSTXT
-		TEXT 'BONUS= 100 X'
+		TEXT 'BONUS=1000 X'
 		BYTE >80
+BYTE20
+		BYTE >20
 		EVEN
 		
 JUSTBONUS
@@ -130,13 +119,14 @@ JUSTBONUS
 HELPHELP
 		TEXT 'HELP'
 		BYTE >80
-FFBYTE
+BYTEFF
 		BYTE >FF
 		EVEN
 		
 * contains noise channel volume for the footstep frames
-runsnd
-		data >f8ff,>ffff
+*runsnd
+* (using the machine character data now)
+*		data >f8ff,>ffff
 
 * tried bit reversal to calculate mirrored patterns, but it only
 * saved 4 bytes -- the data to support it was then larger than
@@ -190,6 +180,7 @@ CHARDAT3
 		DATA >6060,>30F0,>3028,>2828	* 144 player punch
 
 * parts		
+runsnd
 		data >FFFE,>FFFE,>FFFE,>FFFE	* 145	machine
 		data >FFFE,>FCF1,>F1FC,>FEFF	* 146	broken machine
 		
@@ -219,33 +210,29 @@ wafersnd
 		data >038b,>0C90,>0601,>9F00
 		
 fallsound
-		data >0380,>0790,>0102,>8f07
+		data >0580,>0790,>ffff,>0102,>8f07
 		data >0102,>8109,>0102,>8f0a
 		data >0102,>8b0c,>0102,>8e0f
 		data >0102,>8215,>0102,>8c1f
 		data >0102,>883f,>0101,>9f00
 		
 gameoversnd
-		byte 6,>90,>b0
-		byte 136,3,140,1,2
-		byte 4,140,3,141,1,2
-		byte 4,143,3,143,1,2
-		byte 4,131,4,129,2,2
-		byte 4,136,4,132,2,2
-		byte 4,142,4,134,2,2
-		byte 4,132,5,138,2,2
-		byte 4,140,5,141,2,2
-		byte 4,133,6,130,3,2
-		byte 4,128,7,135,3,2
-		byte 4,142,7,142,3,2
-		byte 4,143,8,134,4,2
-		byte 4,135,10,130,5,2
-		byte 4,136,12,129,6,2
-		byte 4,137,15,136,7,2
-		byte 4,137,20,141,9,2
-		byte 4,134,30,131,14,2
-		byte 4,132,58,139,25,2
-		byte 2,>9f,>bf,60
+* from MR DO's death tune
+		byte 6,>cF,>02,>d0,>AC,>03,>B0,9
+		byte 7,>80,>02,>90,>c8,>02,>AF,>02,9
+		byte 3,>9F,>dF,>BF,11
+		byte 9,>8D,>12,>90,>c1,>0E,>d0,>A3,>0B,>B0,9
+		byte 6,>85,>0D,>cD,>0F,>AF,>09,9
+		byte 3,>9F,>dF,>BF,12
+		byte 9,>8A,>06,>90,>c9,>05,>d0,>AB,>04,>B0,9
+		byte 6,>8B,>04,>c4,>06,>A6,>08,9
+		byte 3,>9F,>dF,>BF,12
+		byte 9,>84,>32,>90,>c2,>19,>d0,>A9,>0C,>B0,9
+		byte 6,>8C,>3B,>cE,>1D,>AF,>0E,7
+		byte 3,>92,>d2,>B2,7
+		byte 3,>94,>d4,>B4,7
+		byte 3,>98,>d8,>B8,7
+		byte 3,>9F,>dF,>BF,50
 		byte 1,>9f,0
 		
 gamewin
@@ -258,29 +245,39 @@ gamewin
 		byte 1,>9f,0
 
 punchsnd
-		data >02e5,>f406,>01ff,>0000
+		byte >02
+NOISESND
+		BYTE >E5
+		data >f406,>01ff,>0000
 		
 happysnd
-		byte 3,>90
-		byte 131,21,18
-		byte 2,131,18,18
-		byte 2,128,20,18
-		byte 2,132,17,18
-		byte 2,142,15,18
-		byte 2,130,14,18
-		byte 2,131,15,18
-		byte 2,137,13,18
-		byte 2,139,12,18
-		byte 2,137,11,18
-		byte 2,132,12,18
-		byte 2,131,11,18
-		byte 2,129,9,18
-		byte 2,133,10,18
-		byte 2,139,12,18	
-		byte 1,>9f,0
+* Mermaid from King's Quest II
+		byte 10,>8E,>46,>90,>A5,>4A,>B0,>C0,>5A,>D0,>FF,12
+		byte 1,>88,12
+		byte 1,>8E,12
+		byte 4,>8B,>48,>AC,>4D,>24
+		byte 4,>85,>4A,>A6,>51,>24
+		byte 6,>8B,>47,>A9,>4B,>C3,>5D,12
+		byte 1,>84,12
+		byte 1,>8B,12
+		byte 4,>8C,>49,>A7,>4F,>24
+		byte 4,>89,>4B,>A8,>53,>24
+		byte 6,>8B,>48,>A0,>4D,>CD,>60,12
+		byte 1,>83,12
+		byte 1,>8B,12
+		byte 4,>8F,>4A,>A6,>51,>24
+		byte 4,>80,>4D,>AE,>55,>24
+		byte 6,>89,>4B,>A0,>4D,>C8,>53,>12
+		byte 2,>85,>4A,>12
+		byte 4,>8C,>49,>C6,>51,>24
+		byte 4,>89,>4B,>AC,>CC,>24
+		byte 4,>85,>4A,>C0,>5A,>6E
+		byte 3,>9F,>BF,>DF,30
+		byte 1,>9f,>0
 
 tallysnd
-		data >038f,>1190,>0201,>9f00
+		data >038f,>1190,>0201,>9fb4
+		data >019f,>0000
 
 * label for the end of sound data
 endsound
@@ -306,11 +303,10 @@ INITL1
 		MOVB *R13+,@>8319	* R12 LSB - that allows us to check for 00 here
 		JNE INITL1
 		
-		LI R12,>E11F	* 16k, screen on, ints on, magnify 1 (differs from XB) & automotion limit
+		LI R12,>E10F	* 16k, screen on, ints on, magnify 1 (differs from XB) & automotion limit
 		MOVB R12,@>83d4 * put VDP R1 at the KSCAN reload
 		SWPB R12
-		LI R0,>0F00		* 15 sprites moving
-		MOVB R0,@>837A	* automotion limit
+		MOVB R12,@>837A	* automotion limit, 15 sprites moving
 
 * we won't call CLEAR, user can do that, but we do
 * need to wipe the sprite table
@@ -335,7 +331,9 @@ INITL1
 * inline init	
 *10005 CALL COLOR(10,7,1,11,14,1,12,2,1,13,11,1)
 	bl @vdpcpy
-	data >500d,CDAT,4
+	data >500d,CDAT
+word04	
+	data 4
 	
 *10010 RESTORE		* oh, goodie... data
 *10020 FOR A=96 TO 114
@@ -356,33 +354,26 @@ INITL1
 *10120 SUBEND
 
 *20 CALL CLEAR
+*25 CALL DELSPRITE(ALL)
+*30 CALL MAGNIFY(2)	* already done in the VDP Init
 l20
 		BL @CLEAR
 		
 * run sound init
-		movb @ffbyte,@>8400	* no run sound
-		movb @NOISESND,@>8400 * pfft sound
-
-*25 CALL DELSPRITE(ALL)
-*		BL @DSPRALL		* done in clear
-
-*30 CALL MAGNIFY(2)
-* already done in the VDP Init
+		movb @byteff,@>8400		* no run sound
+		movb @NOISESND,@>8400 	* pfft sound
 
 *40 CALL HCHAR(11,14,105,6)
 *50 CALL HCHAR(13,14,105,6)
-
-		bl *r5
-		byte 11,14,105,6
-		byte 13,14,105,6
-		byte 0,0
-
 *60 CALL VCHAR(11,14,105,3)
 *70 CALL VCHAR(11,19,105,3)
 
-		bl @vcharf
-		byte 11,14,105,3
-		byte 11,19,105,3
+		bl *r5
+		byte 11,14
+byte105		
+		byte 105,7
+		byte 12,14,105,7
+		byte 13,14,105,7
 		byte 0,0
 
 *80 DISPLAY AT(12,13)SIZE(4):"HERO"
@@ -420,8 +411,7 @@ l150
 *155 AS=0 * no longer used - bl animframe instead
 
 *157 NW=4
-	li r0,4
-	mov r0,@nw
+	mov @word04,@nw
 
 *160 CALL DRAW(LE) - this is the only call
 	bl @draw
@@ -445,7 +435,9 @@ l170
 
 *180 CALL SPRITE(#1,96,16,152,32)
 	bl @sprite
-	byte 1,153,32,132,15,0		* player moved to 129-132
+	byte 1,153,32,132
+byte0f	
+	byte 15,0		* player moved to 129-132
 
 	clr @rs
 	clr @cs
@@ -480,7 +472,7 @@ bonusok
 	bl @disbonus
 	
 * run sound off by default	
-	movb @ffbyte,@>8400
+	movb @byteff,@>8400
 	
 * new movement code
 	mov @ij,r0
@@ -744,6 +736,9 @@ l440b
 * check for ground underneath character - if none, fall (32 or 112)
 * and then try to step off it.
 *450 CALL GCHAR(RO+1,CO,QW) :: IF QW=32 THEN 2000
+    mov @ij,r0
+    jne l460                * don't check if we just started to jump
+
 	mov @ro,r0
 	inc r0
 	mov @co,r1
@@ -759,6 +754,7 @@ l450b
 l450c
 
 *460 CALL COINC(ALL,QW) :: IF QW THEN 2000
+l460
 	bl *r6
 	mov r0,r0
 	jeq l460b
@@ -781,8 +777,7 @@ l1000b
 	mov r12,@save
 	mov @bonus,r13
 	bl @disraw
-	li r0,>2000
-	movb r0,@>8C00
+	movb @byte20,@>8C00
 	
 	bl *r6
 
@@ -1064,15 +1059,12 @@ l4180b
 *4330 CALL SOUND(300,B+110,0)
 *4340 CALL SOUND(300,B,0)
 *4350 CALL SOUND(300,B-110,0)
+*4360 FOR A=1 TO 300 :: NEXT A
 	bl @playsound
 	data happysnd-firstsnd+>2500
 	bl @waitsound
 	
-*4360 FOR A=1 TO 300 :: NEXT A
-	bl @cdelay
-	data 30
-	
-*4370 DISPLAY AT(9,10):"BONUS= 100 X"
+*4370 DISPLAY AT(9,10):"BONUS=1000 X"
 	bl @display
 	byte 9,10
 	data bonustxt
@@ -1094,7 +1086,7 @@ l4390b
 	li r2,136
 	bl @hchar1
 	
-	li r0,100
+	li r0,1000
 	a r0,@sc
 	
 	bl @disnum
@@ -1116,24 +1108,9 @@ l4390b
 l4400b
 	
 *4410 FOR A=1 TO 1000 :: CALL KEY(C,K,S) :: IF K=18 THEN 20
-	mov r8,@a
-l4410b
-	mov @a,r0
-	ci r0,2000
-	jh l4420b
-	
-	bl *r6			* slow it down a bit, this is just a timeout delay
-	bl @scan
-	bl @key
-*	ci r1,18    * done in key
-	jne l4420
-	b @l20
-
 *4420 NEXT A :: GOTO 20
-l4420
-	inc @a
-	jmp l4410b
-l4420b
+* now we just wait for the silent sound to end instead, no key abort
+	bl @waitsound
 	b @l20
 	
 * replacing subs with gosub...
@@ -1588,6 +1565,7 @@ SDAT5
 * SAT at >0300 (motion table at >0780, fixed)
 * different from XB - SPT at >0800
 * transparent on XB color 15
+BYTEE1
 VDPTAB  DATA >E108,>4001,>0601,>0E00
 
 * Write address - address is data after the fact
@@ -1777,11 +1755,21 @@ HCHAROUT
 		B *R14
 
 *GCHAR	0=ROW,1=COL, RETURN IN 2
+* very hacky ground fix? if we read space, check
+* the next one. If it's 105 (girder), return that instead
 GCHAR	MOV R11,R14
 		bl @hcharadr
 		DATA >0000
 		bl @wradrf
 		MOVB @>8800,R2
+		CB @byte20,r2
+		jne gchar2
+		swpb r2
+		movb @>8800,r2
+		cb @byte105,r2
+		jeq gchar2
+		swpb r2			* not girder, return original read
+gchar2		
 		srl r2,8
 		B *R14
 		
@@ -2051,8 +2039,7 @@ DELSPR
 		MOV R11,R14
 		bl @spriteadr
 		bl @wradrf
-		li r13,>E100			* sprite automotion doesn't allow values from c1-e0
-		movb r13,*r4
+		movb @bytee1,*r4	* sprite automotion doesn't allow values from c1-e0
 		ai r12,>0480
 		bl @wradrf
 * we know r0 msb must be zero
