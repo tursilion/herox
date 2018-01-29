@@ -78,18 +78,27 @@ bonus bss 2	* bonus timer
 * SHARED VARIABLES
 ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
 
+		DEF GOGAME
+
+* TODO: change here for mini-memory build
+* This requires ANOTHER 250 bytes free for the MM Load and Run option
+* maybe we can do a Playground loader instead?
+*		AORG >7118
+
+* EA#5 version
+*		AORG >A000
+*		DEF START
+*START
+*		b @gogame
+		
+
 * Cartridge Header (if cart, not used for MM)
 		AORG >6000
 		DATA >AA01,>0200,>0000,PROG1,>0000,>0000
-		EVEN
-
-* start in MiniMem RAM range
-		DEF GOGAME
-* todo: enable when it fits in 4k ;)
-*		AORG >7000
-
 PROG1	DATA >0000,GOGAME
 		BYTE >05
+
+* Text starts here - this title IS used by the cart header too		
 HEROX	BYTE >48,>45,>52,>4F,>58		* 'HEROX'
 		BYTE >80
 		EVEN
@@ -339,17 +348,15 @@ word04
 *10020 FOR A=96 TO 114
 *10030 READ A$ :: CALL CHAR(A,A$)
 *10040 NEXT A
-	bl @char
-	byte 96,152
-	data chardat1
+	bl @vdpcpy
+	data >4b00,chardat1,152
 	
 *10050 CALL CHAR(120,"FFFEFFFEFFFEFFFEFFFEFCF1F1FCFEFF")
 * merged into chardat3, new chars
 	
 *10060 CALL CHAR(128,"7E4242427E424242")
-	bl @char
-	byte 128,184
-	data chardat3
+	bl @vdpcpy
+	data >4c00,chardat3,184
 
 *10120 SUBEND
 
@@ -1667,25 +1674,6 @@ DNUMLP
 		DIV R12,R10		* R10=result, R11=remainder (should be zero)
 		MOV R10,R11		* are we done?
 		JNE DNUMLP
-		B *R14
-		
-*CHAR	0=CHAR, 1=NUMBER OF BYTES, 2=ADDRESS OF BYTES
-* Data statements after the call
-CHAR	MOV R11,R14
-		movb *r14+,R12
-
-		SRL R12,8
-		SLA R12,3
-		AI R12,>4800
-		bl @wradrf	* this handles the return
-
-		movb *r14+,R13
-		SRL R13,8
-		mov *r14+,r12
-CHAR2
-		MOVB *R12+,*r4  *inline vdpcpy since vdpcpy isn't embeddable now
-		DEC R13
-		JNE CHAR2
 		B *R14
 		
 * VDP Copy - follow with VDP adr, CPU addr, byte count (word)
