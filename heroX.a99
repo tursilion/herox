@@ -163,6 +163,77 @@ CHARDAT1
 		data >2418,>187E,>99BD,>1818	* 113	boss die
 		data >66FF,>FFFF,>7E3C,>1800	* 114	heart
 
+* This is padding to make the two sets of character
+* data line up so we can use a single vdpcpy call :)
+****** DO NOT CHANGE THE SIZE OF THIS CODE!! ******
+*vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*
+
+* display the number of lives remaining
+showlives
+		li r0,23
+		li r1,4
+		li r2,136
+		mov @nm,r3
+		b @hchar		* hchar handles the return for us
+
+* start a sound list on the ISR
+* pass the VDP address in the data statement
+playsound
+		mov *r11+,@>83cc	* set pointer to VDP sound list
+		socb @>8311,@>83fd	* set the 'vdp' source flag bit (R8 LSB)
+		movb @>8311,@>83ce	* start sound processing
+		b *r11
+		
+* wait for any active playlist to finish
+waitsound
+		mov r11,r10
+waitsnd1
+		bl *r6
+		movb @>83ce,r0
+		jne waitsnd1
+		
+		b *r10
+
+* animmove - animated move of the player sprite,
+* used for the final animation. data statement
+* after the call should include row add, column add,
+* base character (animated 1-4) and number of frames
+* getting hard to find free registers...
+animmove
+* load the variables
+		movb *r11+,r10		* row step
+		sra r10,8
+		movb *r11+,r13		* col step
+		sra r13,8
+		movb *r11+,r15		* base character
+		srl r15,8
+		movb *r11+,r3		* frames
+		srl r3,8
+
+* save return
+		mov r11,@save
+	
+* and away we go!
+animlp1
+		mov r8,r0
+		bl @position		* position lands in r1,r2
+		a r10,r1
+		a r13,r2
+		bl @locate			* update position
+		bl @animframe		* r1 = 1-4
+		a r15,r1
+		bl *r7				* update frame (pattern1)
+		bl *r6				* coinc and delay
+		
+		dec r3
+		jne animlp1
+		
+		mov @save,r11
+		B *r11
+
+*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^*
+****** DO NOT CHANGE THE SIZE OF THIS CODE!! ******
+
 * ladder and player animation		
 CHARDAT3
 		data >7E42,>4242,>7E42,>4242	* 128
@@ -348,15 +419,14 @@ word04
 *10020 FOR A=96 TO 114
 *10030 READ A$ :: CALL CHAR(A,A$)
 *10040 NEXT A
-	bl @vdpcpy
-	data >4b00,chardat1,152
-	
 *10050 CALL CHAR(120,"FFFEFFFEFFFEFFFEFFFEFCF1F1FCFEFF")
-* merged into chardat3, new chars
-	
 *10060 CALL CHAR(128,"7E4242427E424242")
 	bl @vdpcpy
-	data >4c00,chardat3,184
+*	data >4b00,chardat1,152
+	data >4b00,chardat1,444
+	
+*	bl @vdpcpy
+*	data >4c00,chardat3,184
 
 *10120 SUBEND
 
@@ -2088,68 +2158,5 @@ animframe
 		inc r1
 		b *R11
 
-* display the number of lives remaining
-showlives
-		li r0,23
-		li r1,4
-		li r2,136
-		mov @nm,r3
-		b @hchar		* hchar handles the return for us
-
-* start a sound list on the ISR
-* pass the VDP address in the data statement
-playsound
-		mov *r11+,@>83cc	* set pointer to VDP sound list
-		socb @>8311,@>83fd	* set the 'vdp' source flag bit (R8 LSB)
-		movb @>8311,@>83ce	* start sound processing
-		b *r11
-		
-* wait for any active playlist to finish
-waitsound
-		mov r11,r10
-waitsnd1
-		bl *r6
-		movb @>83ce,r0
-		jne waitsnd1
-		
-		b *r10
-
-* animmove - animated move of the player sprite,
-* used for the final animation. data statement
-* after the call should include row add, column add,
-* base character (animated 1-4) and number of frames
-* getting hard to find free registers...
-animmove
-* load the variables
-		movb *r11+,r10		* row step
-		sra r10,8
-		movb *r11+,r13		* col step
-		sra r13,8
-		movb *r11+,r15		* base character
-		srl r15,8
-		movb *r11+,r3		* frames
-		srl r3,8
-
-* save return
-		mov r11,@save
-	
-* and away we go!
-animlp1
-		mov r8,r0
-		bl @position		* position lands in r1,r2
-		a r10,r1
-		a r13,r2
-		bl @locate			* update position
-		bl @animframe		* r1 = 1-4
-		a r15,r1
-		bl *r7				* update frame (pattern1)
-		bl *r6				* coinc and delay
-		
-		dec r3
-		jne animlp1
-		
-		mov @save,r11
-		B *r11
-			
 		END
 
