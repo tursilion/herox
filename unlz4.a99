@@ -1,0 +1,161 @@
+* LZ4 decompressor for 9900
+* Ported by Tursi from LZ4 data decompressor for Apple II
+* by Peter Ferrie (peter.ferrie@gmail.com)
+* destination address is lower than source version
+* It's assumed this code is loaded at the top of memory
+* and some overlap during decompression is possible.
+* 6502 convention - words are little endian
+
+        AORG >E000  * load starting address
+
+oep     equ >e000   * original entry point, you must set this by yourself
+orgoff  equ >a000   * destination address, you must set this by yourself
+paksize	equ 443     * size of packed data, you must set this by yourself
+
+* unpacker variables, no need to change these
+* for now we'll just use registers
+a       equ 0
+x       equ 1
+y       equ 2
+stack   equ 3
+src	    equ 4
+dst     equ 5
+end     equ 6
+count   equ 7
+delta	  equ 8
+val0f   equ 14
+val01   equ 15
+
+pakoff
+*
+* Data file test.lz4 - Feb 01, 2018
+*
+  BYTE >04,>22,>4D,>18,>64,>40,>A7,>A8  * 00000000 ."M.d@..
+  BYTE >01,>00,>00,>F0,>37,>36,>35,>30  * 00000008 ....7650
+  BYTE >32,>20,>4D,>69,>63,>72,>6F,>70  * 00000010 2 Microp
+  BYTE >72,>6F,>63,>65,>73,>73,>6F,>72  * 00000018 rocessor
+  BYTE >0D,>0A,>0D,>0A,>20,>4D,>6F,>73  * 00000020 .... Mos
+  BYTE >74,>20,>6F,>66,>20,>74,>68,>65  * 00000028 t of the
+  BYTE >20,>66,>6F,>6C,>6C,>6F,>77,>69  * 00000030  followi
+  BYTE >6E,>67,>20,>69,>6E,>66,>6F,>72  * 00000038 ng infor
+  BYTE >6D,>61,>74,>69,>6F,>6E,>20,>68  * 00000040 mation h
+  BYTE >61,>73,>20,>62,>65,>65,>6E,>20  * 00000048 as been 
+  BYTE >74,>61,>6B,>1C,>00,>25,>6F,>75  * 00000050 tak..%ou
+  BYTE >31,>00,>F0,>4D,>22,>43,>6F,>6D  * 00000058 1..M"Com
+  BYTE >6D,>6F,>64,>6F,>72,>65,>20,>36  * 00000060 modore 6
+  BYTE >34,>0D,>0A,>50,>72,>6F,>67,>72  * 00000068 4..Progr
+  BYTE >61,>6D,>6D,>65,>72,>73,>20,>52  * 00000070 ammers R
+  BYTE >65,>66,>65,>72,>65,>6E,>63,>65  * 00000078 eference
+  BYTE >20,>4D,>61,>6E,>75,>61,>6C,>22  * 00000080  Manual"
+  BYTE >20,>73,>69,>6D,>70,>6C,>79,>20  * 00000088  simply 
+  BYTE >62,>65,>63,>61,>75,>73,>65,>20  * 00000090 because 
+  BYTE >69,>74,>20,>77,>61,>73,>20,>61  * 00000098 it was a
+  BYTE >76,>61,>69,>6C,>61,>62,>6C,>65  * 000000A0 vailable
+  BYTE >20,>69,>6E,>20,>65,>6C,>65,>63  * 000000A8  in elec
+  BYTE >74,>72,>6F,>6E,>69,>63,>0D,>0A  * 000000B0 tronic..
+  BYTE >81,>00,>40,>20,>61,>6E,>64,>69  * 000000B8 ..@ andi
+  BYTE >00,>F4,>08,>72,>65,>20,>61,>70  * 000000C0 ...re ap
+  BYTE >70,>65,>61,>72,>73,>20,>74,>6F  * 000000C8 pears to
+  BYTE >20,>62,>65,>20,>6E,>6F,>20,>64  * 000000D0  be no d
+  BYTE >69,>66,>62,>00,>41,>62,>65,>74  * 000000D8 ifb.Abet
+  BYTE >77,>A1,>00,>C2,>68,>69,>73,>20  * 000000E0 w...his 
+  BYTE >64,>6F,>63,>75,>6D,>65,>6E,>74  * 000000E8 document
+  BYTE >BD,>00,>50,>61,>6E,>64,>0D,>0A  * 000000F0 ..Pand..
+  BYTE >AB,>00,>01,>00,>01,>09,>1C,>00  * 000000F8 ........
+  BYTE >10,>2C,>5A,>00,>F3,>01,>79,>20  * 00000100 .,Z...y 
+  BYTE >61,>72,>65,>20,>62,>6F,>74,>68  * 00000108 are both
+  BYTE >20,>66,>72,>6F,>6D,>20,>2B,>00  * 00000110  from +.
+  BYTE >F1,>17,>30,>20,>66,>61,>6D,>69  * 00000118 ..0 fami
+  BYTE >6C,>79,>20,>61,>66,>74,>65,>72  * 00000120 ly after
+  BYTE >20,>61,>6C,>6C,>2E,>20,>49,>27  * 00000128  all. I'
+  BYTE >76,>65,>0D,>0A,>6D,>61,>64,>65  * 00000130 ve..made
+  BYTE >20,>63,>68,>61,>6E,>67,>65,>73  * 00000138  changes
+  BYTE >9F,>00,>40,>61,>64,>64,>69,>4F  * 00000140 ..@addiO
+  BYTE >00,>34,>73,>20,>77,>A9,>00,>00  * 00000148 .4s w...
+  BYTE >64,>01,>51,>69,>61,>74,>65,>2E  * 00000150 d.Qiate.
+  BYTE >62,>01,>10,>49,>99,>00,>F0,>00  * 00000158 b..I....
+  BYTE >65,>6F,>72,>79,>20,>79,>6F,>75  * 00000160 eory you
+  BYTE >20,>73,>68,>6F,>75,>6C,>64,>C4  * 00000168  should.
+  BYTE >00,>01,>F5,>00,>30,>74,>6F,>20  * 00000170 ....0to 
+  BYTE >0D,>01,>81,>61,>6E,>79,>20,>63  * 00000178 ...any c
+  BYTE >6F,>64,>65,>23,>00,>F4,>07,>63  * 00000180 ode#...c
+  BYTE >61,>6E,>20,>66,>69,>6E,>64,>20  * 00000188 an find 
+  BYTE >66,>6F,>72,>20,>65,>6D,>75,>6C  * 00000190 for emul
+  BYTE >61,>74,>69,>6E,>67,>C7,>00,>40  * 00000198 ating..@
+  BYTE >31,>30,>20,>28,>0A,>00,>44,>43  * 000001A0 10 (..DC
+  BYTE >36,>34,>20,>CB,>01,>50,>72,>29  * 000001A8 64 ..Pr)
+  BYTE >2E,>0D,>0A,>00,>00,>00,>00,>C1  * 000001B0 ........
+  BYTE >63,>38,>BB                      * 000001B8 c8.
+
+* unpacker entrypoint
+  def unpack
+unpack  
+  lwpi >8300          * safe workspace
+  li val01,>0100      * an >01 byte value
+  li val0f,>0f00      * an >0F byte value
+  
+  li src,pakoff       * packed data address (below)
+  li end,pakoff+paksize
+  li dst,orgoff
+
+parsetoken
+	movb *src+,a        * getsrc
+	movb a,stack        * pha
+  srl a,4             * lsr,lsr,lsr,lsr
+  movb a,a            * cause we only care about the byte
+	jeq	copymatches
+	bl @buildcount
+	movb a,x
+	bl @docopy
+	c src,end
+	jhe done
+
+copymatches
+	movb *src+,delta    * getsrc -> lsb
+	swpb delta
+  movb *src+,delta    * getsrc -> msb
+	movb stack,a        * pla
+	andi a,>0f00
+	bl @buildcount
+	ai a,>0400          * clc, adc #4
+	jnc	cm1
+	ab val01,y          * iny
+cm1
+	movb a,x            * re-ordered instruction
+  mov src,stack       * lda src+1,pha,lda	src,pha
+	mov dst,src         * sec,lda dst,sbc delta,sta src (con)
+	s delta,src         * lda dst+1,sbc delta+1,sta src+1
+	bl @docopy
+	mov stack,src       * pla,sta src,pla,sta src+1
+	jmp	parsetoken
+
+done
+  b @oep              * pla, rts (backed by pha's in the original setup code)
+
+docopy
+  movb *src+,*dst+    * getput
+  sb val01,x          * dex
+	jne	docopy
+	sb val01,y          * dey
+	jne	docopy
+	rt
+
+buildcount
+	movb val01,y        * ldy	#1
+	cb val0f,a          * cmp #$0f
+	jne	bc2
+bc1
+	movb a,count
+	movb *src+,a        * getsrc
+	movb a,x
+	a count,a           * clc,adc count
+	jnc bc3
+	ab val01,y          * iny
+bc3
+	ab val01,x          * inx
+	jeq	bc1
+bc2
+	rt
+
+  end
+  
