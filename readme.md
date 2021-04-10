@@ -1,3 +1,9 @@
+HeroX
+=====
+
+![Screenshot](https://github.com/tursilion/classic99/raw/master/dist/HeroX_1.png)
+![Screenshot](https://github.com/tursilion/classic99/raw/master/dist/HeroX_2.png)
+
 HeroX (he-ro-ex) is a port of a game I created for XB back in 1987 or 1988, best that I can remember. I had just started to figure out when to use and when not to use automotion, and this was the result. It was still slow, clunky, and had a lot of bugs, but it had a little charm.
 
 For the 4k demo I decided to revise it, figuring it should fit in a small amount of memory and I could enhance it. I used the technique I used for porting TI Farmer and ZomBXB from the Short and Sweet Game contest to port the game from XB. The resulting game was 6k -- too large, but over the course of a couple of weeks I was able to shrink it down and then eventually added smooth motion, animations, sound effects and even a little music.
@@ -42,3 +48,10 @@ Bonus time: each level has a countdown timer. If you clear the level before time
 The timer is frame accurate. I'm hoping people might try a high score competition. There are lots of ways to edge a few extra bonus points for time. ;)
 
 You get three lives. No bonus lives are awarded. Game Over if you run out of lives.
+
+Want to donate?
+---------------
+
+- Click here for [Ko-Fi](https://ko-fi.com/tursilion)...
+- Alternately, there's my [Amazon Wishlist](http://www.amazon.com/gp/registry/2AFCOAM5DD1L6/ref=cm_aya_wl/103-5991996-6483001)
+
