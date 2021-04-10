@@ -44,18 +44,6 @@
 * C0 - DF - Interrupt workspace
 * E0 - FF - GPLWS
 
-* cdelay 	- 10 hits
-* animmove 	- 7 hits
-* vcharf 	- 7 hits
-* display 	- 6 hits
-* position 	- 6 hits
-* animframe - 5 hits
-* disnum 	- 5 hits
-* spriteadr - 5 hits
-* wradrf	- 5 hits
-* gchar 	- 4 hits
-* waitsound - 4 hits
-
 * Variables in RAM
 *
 	AORG >8320
@@ -84,20 +72,29 @@ ENDVARS BSS 2			* just dummy so the listing file has an address (do not use)
 * This requires ANOTHER 250 bytes free for the MM Load and Run option
 * maybe we can do a Playground loader instead?
 *		AORG >7118
-
+*---------------------------------------
 * EA#5 version
-*		AORG >A000
-*		DEF START
-*START
-*		b @gogame
-		
-
+		AORG >A000
+		DEF START
+START
+		b @gogame
+*---------------------------------------
 * Cartridge Header (if cart, not used for MM)
-		AORG >6000
-		DATA >AA01,>0200,>0000,PROG1,>0000,>0000
-PROG1	DATA >0000,GOGAME
-		BYTE >05
-
+*		AORG >6000
+*		DATA >AA01,>0200,>0000,PROG1,>0000,>0000
+*PROG1	DATA >0000,GOGAME
+*		BYTE >05
+*---------------------------------------
+* playground loader version
+* thanks Senior Falcon!!
+* also a few bytes at the end for SLAST!
+*		DEF SLOAD,SFIRST,SLAST
+*		AORG >7000
+*SLOAD
+*SFIRST
+*		B @GOGAME
+		
+		
 * Text starts here - this title IS used by the cart header too		
 HEROX	BYTE >48,>45,>52,>4F,>58		* 'HEROX'
 		BYTE >80
@@ -2157,6 +2154,11 @@ animframe
 		andi r1,3
 		inc r1
 		b *R11
+
+* this is needed for the Playground loader
+*SLAST
+*		AORG >A004
+*		DATA SLAST
 
 		END
 
