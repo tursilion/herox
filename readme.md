@@ -1,8 +1,8 @@
 HeroX
 =====
 
-![Screenshot](https://github.com/tursilion/classic99/raw/master/dist/HeroX_1.png)
-![Screenshot](https://github.com/tursilion/classic99/raw/master/dist/HeroX_2.png)
+![Screenshot](https://github.com/tursilion/herox/raw/master/dist/HeroX_1.png)
+![Screenshot](https://github.com/tursilion/herox/raw/master/dist/HeroX_2.png)
 
 HeroX (he-ro-ex) is a port of a game I created for XB back in 1987 or 1988, best that I can remember. I had just started to figure out when to use and when not to use automotion, and this was the result. It was still slow, clunky, and had a lot of bugs, but it had a little charm.
 
