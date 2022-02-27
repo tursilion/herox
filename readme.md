@@ -14,6 +14,8 @@ HERO(XB) is the original Extended BASIC program that I started with, just for sa
 
 HERO(XB), HEROX_EA5 and HEROX_BAS are also both on the included HEROX.DSK disk image, and may be used with emulation or transferred to hardware via any of the disk transfer techniques.
 
+"HERO V1.3 (1988) [Compiled by TMOP]_8.bin" is a 32kb ROM file - a version of the XB game compiled by TMOP.
+
 Finally, HEROX.A99 is the source code. Feel free to rip ideas or techniques but please check with me before using as the basis for your own title. Also at Github: https://github.com/tursilion/herox
 
 This is my entry into the 2018 4k contest. Thanks!
